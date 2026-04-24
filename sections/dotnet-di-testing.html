@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>.NET — DI Extension Method + xUnit Testing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-green">🧪</div>
+  <div>
+    <div class="section-title">.NET — DI Extension Method + xUnit Testing</div>
+    <div class="section-desc">Pattern InjectApplicationServices, xUnit project setup, Moq, riferimenti tra progetti</div>
+  </div>
+</div>
+
+<!-- Extension method DI -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Pattern — InjectApplicationServices Extension</span><span class="card-tag tag-service">dependency injection</span></div>
+  <div class="card-body">
+    <p>Raggruppa tutte le registrazioni DI del layer Application in un unico metodo estensione statico, mantenendo Program.cs pulito.</p>
+    <pre><span class="cmt">// Application/InjectAppServices.cs</span>
+<span class="kw">using</span> Microsoft.Extensions.DependencyInjection;
+<span class="kw">using</span> Application.Services;
+<span class="kw">using</span> Application.Commands;
+
+<span class="kw">namespace</span> Application
+{
+    <span class="kw">public static class</span> <span class="cls">InjectAppServices</span>
+    {
+        <span class="kw">public static</span> <span class="cls">IServiceCollection</span> <span class="fn">InjectApplicationServices</span>(
+            <span class="kw">this</span> <span class="cls">IServiceCollection</span> self)
+        {
+            self.<span class="fn">AddScoped</span>&lt;<span class="cls">IAccountService</span>, <span class="cls">AccountService</span>&gt;();
+            self.<span class="fn">AddScoped</span>&lt;<span class="cls">IDeviceDataService</span>, <span class="cls">DeviceDataService</span>&gt;();
+            self.<span class="fn">AddScoped</span>&lt;<span class="cls">DppMachineService</span>&gt;();
+            self.<span class="fn">AddAutoMapper</span>(<span class="kw">typeof</span>(<span class="cls">MappingProfile</span>));
+            self.<span class="fn">AddHostedService</span>&lt;<span class="cls">MqttBackgroundService</span>&gt;();
+            <span class="kw">return</span> self;
+        }
+    }
+}</pre>
+    <pre><span class="cmt">// Program.cs — uso</span>
+builder.Services.<span class="fn">InjectApplicationServices</span>();</pre>
+    <div class="info-box">
+      <div class="info-title">Vantaggi del pattern</div>
+      <div class="rule-text">Separa la responsabilità di registrazione per layer (Application, Infrastructure, ecc.). Program.cs resta leggibile. Ogni layer può avere il proprio extension method. Facilita il testing perché si possono sovrascrivere singoli servizi.</div>
+    </div>
+  </div>
+</div>
+
+<!-- xUnit setup -->
+<div class="card">
+  <div class="card-header"><span class="card-title">xUnit — Creazione Progetto di Test</span><span class="card-tag tag-action">xunit</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># 1. Crea il progetto di test</span>
+dotnet new xunit -n MyApp.Test
+
+<span class="cmt"># 2. Aggiungi i pacchetti necessari</span>
+dotnet add package xunit
+dotnet add package Moq
+dotnet add package Microsoft.NET.Test.Sdk
+dotnet add package xunit.runner.visualstudio
+dotnet add package coverlet.collector
+
+<span class="cmt"># 3. Aggiungi riferimento al progetto da testare</span>
+dotnet add reference ../MyApp/MyApp.csproj
+
+<span class="cmt"># 4. Aggiungi il progetto test alla solution</span>
+dotnet sln add MyApp.Test/MyApp.Test.csproj
+
+<span class="cmt"># 5. Esegui i test</span>
+cd MyApp.Test
+dotnet test</pre>
+  </div>
+</div>
+
+<!-- Riferimento progetto in .csproj -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Aggiungere ProjectReference in .csproj</span><span class="card-tag tag-pattern">multi-project</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">&lt;!-- Nel .csproj del progetto test --&gt;</span>
+&lt;ItemGroup&gt;
+  &lt;ProjectReference Include=<span class="str">"..\WebApp_OPCUA_BLL\WebApp_OPCUA_BLL.csproj"</span> /&gt;
+&lt;/ItemGroup&gt;</pre>
+    <pre><span class="cmt">// Registrazioni tipiche per un progetto OPCUA</span>
+<span class="kw">using</span> Supervysor.Utilities;       <span class="cmt">// OpcuaClient</span>
+<span class="kw">using</span> WebApp_OPCUA_BLL.Utilities; <span class="cmt">// IDataManager, DataManager</span>
+
+services.<span class="fn">AddSingleton</span>&lt;<span class="cls">IDataManager</span>, <span class="cls">DataManager</span>&gt;();
+services.<span class="fn">AddSingleton</span>&lt;<span class="cls">OpcuaClient</span>&gt;();</pre>
+  </div>
+</div>
+
+<!-- Moq base -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Moq — Pattern Base per Test con Mock</span><span class="card-tag tag-state">moq</span></div>
+  <div class="card-body">
+    <pre><span class="kw">using</span> Moq;
+<span class="kw">using</span> Xunit;
+
+<span class="kw">public class</span> <span class="cls">AccountServiceTests</span>
+{
+    <span class="kw">private readonly</span> <span class="cls">Mock</span>&lt;<span class="cls">IAccountRepository</span>&gt; _repoMock;
+    <span class="kw">private readonly</span> <span class="cls">AccountService</span> _sut; <span class="cmt">// System Under Test</span>
+
+    <span class="kw">public</span> <span class="cls">AccountServiceTests</span>()
+    {
+        _repoMock = <span class="kw">new</span> <span class="cls">Mock</span>&lt;<span class="cls">IAccountRepository</span>&gt;();
+        _sut = <span class="kw">new</span> <span class="cls">AccountService</span>(_repoMock.Object);
+    }
+
+    [<span class="cls">Fact</span>]
+    <span class="kw">public async</span> <span class="cls">Task</span> <span class="fn">GetById_ReturnsUser_WhenExists</span>()
+    {
+        <span class="cmt">// Arrange</span>
+        <span class="kw">var</span> expected = <span class="kw">new</span> <span class="cls">User</span> { Id = <span class="num">1</span>, Name = <span class="str">"Mario"</span> };
+        _repoMock.<span class="fn">Setup</span>(r => r.<span class="fn">GetByIdAsync</span>(<span class="num">1</span>))
+                 .<span class="fn">ReturnsAsync</span>(expected);
+
+        <span class="cmt">// Act</span>
+        <span class="kw">var</span> result = <span class="kw">await</span> _sut.<span class="fn">GetByIdAsync</span>(<span class="num">1</span>);
+
+        <span class="cmt">// Assert</span>
+        Assert.<span class="fn">Equal</span>(expected.Name, result.Name);
+        _repoMock.<span class="fn">Verify</span>(r => r.<span class="fn">GetByIdAsync</span>(<span class="num">1</span>), <span class="cls">Times</span>.Once);
+    }
+}</pre>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

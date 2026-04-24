@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-green">🚀</div>
+        <div>
+          <div class="section-title">Setup Progetto da Zero</div>
+          <div class="section-desc">Angular standalone + NGXS + HttpClient — dal nulla al primo dispatch</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">1 — Crea il progetto Angular</span></div>
+        <pre>
+<span class="cmt"># Installa Angular CLI se non presente</span>
+npm install -g @angular/cli
+
+<span class="cmt"># Crea il progetto (standalone di default da Angular 17+)</span>
+ng new my-app --standalone --routing --style=scss
+cd my-app
+ng serve</pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">2 — Installa NGXS</span></div>
+        <pre>
+npm install @ngxs/store @ngxs/devtools-plugin @ngxs/logger-plugin</pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">3 — Configura app.config.ts</span></div>
+        <pre>
+<span class="kw">import</span> { ApplicationConfig } <span class="kw">from</span> <span class="str">'@angular/core'</span>;
+<span class="kw">import</span> { provideRouter } <span class="kw">from</span> <span class="str">'@angular/router'</span>;
+<span class="kw">import</span> { provideStore } <span class="kw">from</span> <span class="str">'@ngxs/store'</span>;
+<span class="kw">import</span> { provideNgxsDevtoolsPlugin } <span class="kw">from</span> <span class="str">'@ngxs/devtools-plugin'</span>;
+<span class="kw">import</span> { provideHttpClient } <span class="kw">from</span> <span class="str">'@angular/common/http'</span>;
+<span class="kw">import</span> { routes } <span class="kw">from</span> <span class="str">'./app.routes'</span>;
+<span class="kw">import</span> { UserState } <span class="kw">from</span> <span class="str">'./state/user.state'</span>;
+
+<span class="kw">export const</span> appConfig: ApplicationConfig = {
+  providers: [
+    <span class="fn">provideRouter</span>(routes),
+    <span class="fn">provideStore</span>([UserState]),     <span class="cmt">// aggiungi i tuoi State qui</span>
+    <span class="fn">provideNgxsDevtoolsPlugin</span>(),   <span class="cmt">// Redux DevTools nel browser</span>
+    <span class="fn">provideHttpClient</span>()
+  ]
+};</pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">4 — Struttura cartelle consigliata</span></div>
+        <pre>
+src/app/
+  app.config.ts
+  app.routes.ts
+  store/
+    plant/
+      plant.actions.ts   <span class="cmt">// tutte le Action</span>
+      plant.state.ts     <span class="cmt">// State + Selectors + @Action</span>
+      plant.model.ts     <span class="cmt">// interfacce StateModel + domain models</span>
+    alarms/
+      alarms.actions.ts
+      alarms.state.ts
+  services/
+    plant-api.service.ts <span class="cmt">// solo HTTP, niente NGXS</span>
+  components/
+    plant-list/</pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">5 — Registra State e Routing</span></div>
+        <pre>
+<span class="cmt">// app.routes.ts</span>
+<span class="kw">export const</span> routes: Routes = [
+  { path: <span class="str">''</span>, redirectTo: <span class="str">'users'</span>, pathMatch: <span class="str">'full'</span> },
+  { path: <span class="str">'users'</span>, component: UserListComponent },
+  { path: <span class="str">'users/:id'</span>, component: UserDetailComponent },
+  { path: <span class="str">'**'</span>, redirectTo: <span class="str">'users'</span> }
+];
+
+<span class="cmt">// Per aggiungere un nuovo State → basta aggiungerlo in provideStore([...])</span></pre>
+      </div>
+
+      <div class="rule-box" style="border-color: rgba(34,197,94,0.3)">
+        <div class="rule-title">✅ Checklist setup</div>
+        <div class="rule-text">
+          ☑ <code>--standalone</code> nella creazione progetto<br>
+          ☑ <code>provideStore([...])</code> in app.config.ts<br>
+          ☑ <code>provideHttpClient()</code> in app.config.ts<br>
+          ☑ <code>provideNgxsDevtoolsPlugin()</code> per debug<br>
+          ☑ State registrato nell'array di <code>provideStore</code><br>
+          ☑ <code>ng serve</code> funzionante prima di aggiungere feature
+        </div>
+      </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Angular — @Input/@Output e Parent-Child Binding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-blue">🔗</div>
+  <div>
+    <div class="section-title">Angular — @Input/@Output e Parent-Child Binding</div>
+    <div class="section-desc">Passaggio dati tra componenti, EventEmitter, two-way binding, getter/setter</div>
+  </div>
+</div>
+
+<!-- Sintesi rapida -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Sintesi — Regola Mentale</span><span class="card-tag tag-rule">quick ref</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// [prop]      → parent → child   (Input: riceve dato)</span>
+<span class="cmt">// (propChange) → child → parent  (Output: emette evento)</span>
+<span class="cmt">// [(prop)]    → two-way binding  (Input + Output insieme)</span></pre>
+    <div class="info-box">
+      <div class="info-title">Errore comune</div>
+      <div class="rule-text"><code>@Output() public myVar: string = ''</code> — sbagliato! <code>@Output()</code> non serve a esportare variabili ma solo a dichiarare <strong>EventEmitter</strong>. Senza emissione esplicita, il parent non riceverà mai nulla.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Architettura -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Architettura Parent-Child — Schema</span><span class="card-tag tag-pattern">pattern</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">        Parent Component</span>
+<span class="cmt">  +-------------------------------+</span>
+<span class="cmt">  | selectedEditProviderId        |  ← proprietà del parent</span>
+<span class="cmt">  | configuration                 |  ← oggetto condiviso</span>
+<span class="cmt">  +-------------------------------+</span>
+<span class="cmt">                 |</span>
+<span class="cmt">                 | [configuration]          → parent → child</span>
+<span class="cmt">                 | [(selectedProviderId)]   → two-way binding</span>
+<span class="cmt">                 v</span>
+<span class="cmt">        Child Component (Edit)</span>
+<span class="cmt">  +-------------------------------+</span>
+<span class="cmt">  | @Input()  configuration       |</span>
+<span class="cmt">  | @Input()  selectedProviderId  |</span>
+<span class="cmt">  | @Output() selectedProviderIdChange = new EventEmitter()</span>
+<span class="cmt">  |                               |</span>
+<span class="cmt">  | onProviderChanged(id)         |</span>
+<span class="cmt">  |  → emit → aggiorna parent    |</span>
+<span class="cmt">  +-------------------------------+</span></pre>
+  </div>
+</div>
+
+<!-- @Input -->
+<div class="card">
+  <div class="card-header"><span class="card-title">1. @Input() — Parent → Child</span><span class="card-tag tag-action">input</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// Parent</span>
+@<span class="cls">Component</span>({
+  selector: <span class="str">'app-parent'</span>,
+  template: <span class="str">`
+    &lt;dynamic-component-title-edit
+        [description]="description"&gt;
+    &lt;/dynamic-component-title-edit&gt;
+  `</span>
+})
+<span class="kw">export class</span> <span class="cls">ParentComponent</span> {
+  description = <span class="str">'Titolo iniziale'</span>;
+}
+
+<span class="cmt">// Child</span>
+@<span class="cls">Component</span>({
+  selector: <span class="str">'dynamic-component-title-edit'</span>,
+  template: <span class="str">`&lt;input [value]="description"&gt;`</span>
+})
+<span class="kw">export class</span> <span class="cls">DynamicComponentTitleEditComponent</span> {
+  @<span class="cls">Input</span>() description!: <span class="typ">string</span>;
+}</pre>
+  </div>
+</div>
+
+<!-- @Output -->
+<div class="card">
+  <div class="card-header"><span class="card-title">2. @Output() + EventEmitter — Child → Parent</span><span class="card-tag tag-state">output</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// Child: emette l'evento quando il valore cambia</span>
+@<span class="cls">Component</span>({
+  selector: <span class="str">'dynamic-component-title-edit'</span>,
+  template: <span class="str">`
+    &lt;input [value]="description"
+           (input)="onDescriptionChange($event.target.value)"&gt;
+  `</span>
+})
+<span class="kw">export class</span> <span class="cls">DynamicComponentTitleEditComponent</span> {
+  @<span class="cls">Input</span>()  description!: <span class="typ">string</span>;
+  @<span class="cls">Output</span>() descriptionChange = <span class="kw">new</span> <span class="cls">EventEmitter</span>&lt;<span class="typ">string</span>&gt;();
+
+  <span class="fn">onDescriptionChange</span>(value: <span class="typ">string</span>) {
+    <span class="kw">this</span>.descriptionChange.<span class="fn">emit</span>(value);
+  }
+}
+
+<span class="cmt">// Parent: ascolta l'evento</span>
+@<span class="cls">Component</span>({
+  selector: <span class="str">'app-parent'</span>,
+  template: <span class="str">`
+    &lt;dynamic-component-title-edit
+        [description]="description"
+        (descriptionChange)="description = $event"&gt;
+    &lt;/dynamic-component-title-edit&gt;
+  `</span>
+})
+<span class="kw">export class</span> <span class="cls">ParentComponent</span> {
+  description = <span class="str">'Titolo iniziale'</span>;
+}</pre>
+    <div class="rule-box">
+      <div class="rule-title">Come funziona il two-way binding [(prop)]</div>
+      <div class="rule-text">Per abilitare <code>[(description)]</code>, il child deve avere sia <code>@Input() description</code> che <code>@Output() descriptionChange</code> (stesso nome + "Change"). Angular espande automaticamente <code>[(description)]="val"</code> in <code>[description]="val" (descriptionChange)="val = $event"</code>.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Getter/setter -->
+<div class="card">
+  <div class="card-header"><span class="card-title">3. Getter/Setter nel Parent — Aggiornamento Oggetto Condiviso</span><span class="card-tag tag-pattern">getter/setter</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// Parent: usa getter/setter per aggiornare configuration</span>
+@<span class="cls">Component</span>({
+  selector: <span class="str">'app-parent'</span>,
+  template: <span class="str">`
+    &lt;dynamic-component-title-edit
+        [(description)]="description"&gt;
+    &lt;/dynamic-component-title-edit&gt;
+  `</span>
+})
+<span class="kw">export class</span> <span class="cls">ParentComponent</span> {
+  configuration: <span class="cls">TitleConfiguration</span> = {
+    descriptions: [{ languageId: <span class="num">1</span>, text: <span class="str">'Titolo iniziale'</span> }],
+    headingStyle: <span class="str">'h1'</span>
+  };
+
+  <span class="kw">get</span> <span class="fn">description</span>(): <span class="typ">string</span> {
+    <span class="kw">return this</span>.configuration.descriptions[<span class="num">0</span>]?.text ?? <span class="str">''</span>;
+  }
+
+  <span class="kw">set</span> <span class="fn">description</span>(value: <span class="typ">string</span>) {
+    <span class="kw">this</span>.configuration.descriptions[<span class="num">0</span>].text = value;
+  }
+}</pre>
+    <p style="margin-top:10px;color:var(--text-dim)">Il child usa <code>[(ngModel)]="description"</code>: richiama il getter per leggere e il setter per aggiornare l'oggetto configuration nel parent in modo trasparente.</p>
+  </div>
+</div>
+
+<!-- Template parent con *ngIf -->
+<div class="card">
+  <div class="card-header"><span class="card-title">4. Template Parent — Mostrare Edit o View con *ngIf</span><span class="card-tag tag-component">template</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">&lt;!-- Parent template --&gt;</span>
+&lt;dynamic-component-checkbox-edit *<span class="kw">ngIf</span>=<span class="str">"editService.editMode"</span>
+    [configuration]=<span class="str">"configuration"</span>
+    [availableProviders]=<span class="str">"availableProviders"</span>
+    [(selectedProviderId)]=<span class="str">"selectedEditProviderId"</span>&gt;
+&lt;/dynamic-component-checkbox-edit&gt;
+
+&lt;dynamic-component-checkbox-view *<span class="kw">ngIf</span>=<span class="str">"!editService.editMode"</span>
+    [configuration]=<span class="str">"configuration"</span>&gt;
+&lt;/dynamic-component-checkbox-view&gt;</pre>
+  </div>
+</div>
+
+<!-- Template Angular con pulsanti -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Esempio — Pulsanti con [disabled] e (click)</span><span class="card-tag tag-component">template</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">&lt;!-- Binding completo su pulsanti di azione --&gt;</span>
+&lt;div class=<span class="str">"controls"</span>&gt;
+  &lt;button (click)=<span class="str">"connect()"</span>
+          [disabled]=<span class="str">"status.isConnected"</span>&gt;
+    Connetti
+  &lt;/button&gt;
+
+  &lt;button (click)=<span class="str">"disconnect()"</span>
+          [disabled]=<span class="str">"!status.isConnected"</span>&gt;
+    Disconnetti
+  &lt;/button&gt;
+
+  &lt;button (click)=<span class="str">"refreshVariables()"</span>
+          [disabled]=<span class="str">"loading"</span>&gt;
+    &lt;span *<span class="kw">ngIf</span>=<span class="str">"loading"</span>&gt;⟳&lt;/span&gt;
+    Aggiorna
+  &lt;/button&gt;
+&lt;/div&gt;</pre>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

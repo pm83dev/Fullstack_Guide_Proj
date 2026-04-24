@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>spaproxy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-orange">🔗</div>
+        <div>
+          <div class="section-title">SpaProxy .NET + Angular</div>
+          <div class="section-desc">Avvio integrato dev: F5 da VS Code lancia sia .NET che Angular CLI</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Come funziona</span></div>
+        <div class="flow">
+          <div class="flow-row">
+            <span class="flow-node fn-blue">VS Code F5</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-label">Legge <code>launch.json</code>, lancia Chrome su <code>https://localhost:50663</code></span>
+          </div>
+          <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+          <div class="flow-row">
+            <span class="flow-node fn-orange">.NET avvia</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-label"><code>ASPNETCORE_HOSTINGSTARTUPASSEMBLIES=Microsoft.AspNetCore.SpaProxy</code></span>
+          </div>
+          <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+          <div class="flow-row">
+            <span class="flow-node fn-green">SpaProxy</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-label">Lancia <code>npm start</code> → Angular su <code>https://localhost:4200</code></span>
+          </div>
+          <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+          <div class="flow-row">
+            <span class="flow-node fn-purple">Proxy</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-label">:50663 → Angular :4200 | API REST rimangono su .NET</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">File: AppBase.Api.csproj</span></div>
+        <pre>
+&lt;<span class="cls">PropertyGroup</span>&gt;
+  &lt;<span class="prop">SpaRoot</span>&gt;..\frontend&lt;/<span class="prop">SpaRoot</span>&gt;
+  &lt;<span class="prop">SpaProxyServerUrl</span>&gt;http://localhost:4200&lt;/<span class="prop">SpaProxyServerUrl</span>&gt;
+  &lt;<span class="prop">SpaProxyLaunchCommand</span>&gt;npm start&lt;/<span class="prop">SpaProxyLaunchCommand</span>&gt;
+  &lt;<span class="prop">SpaProxyWorkingDirectory</span>&gt;$(SpaRoot)&lt;/<span class="prop">SpaProxyWorkingDirectory</span>&gt;
+&lt;/<span class="cls">PropertyGroup</span>&gt;
+
+&lt;<span class="cls">ItemGroup</span>&gt;
+  &lt;<span class="prop">PackageReference</span> Include=<span class="str">"Microsoft.AspNetCore.SpaProxy"</span> Version=<span class="str">"10.0.5"</span> /&gt;
+&lt;/<span class="cls">ItemGroup</span>&gt;</pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">File: launchSettings.json (profilo HTTPS)</span></div>
+        <pre>
+<span class="str">"https"</span>: {
+  <span class="str">"commandName"</span>: <span class="str">"Project"</span>,
+  <span class="str">"launchBrowser"</span>: <span class="kw">true</span>,
+  <span class="str">"environmentVariables"</span>: {
+    <span class="str">"ASPNETCORE_ENVIRONMENT"</span>: <span class="str">"Development"</span>,
+    <span class="str">"ASPNETCORE_HOSTINGSTARTUPASSEMBLIES"</span>: <span class="str">"Microsoft.AspNetCore.SpaProxy"</span>
+  },
+  <span class="str">"applicationUrl"</span>: <span class="str">"https://localhost:7083;http://localhost:5095"</span>
+}</pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">File: proxy.conf.js (Angular → .NET)</span></div>
+        <pre>
+<span class="kw">const</span> { env } = <span class="fn">require</span>(<span class="str">'process'</span>);
+
+<span class="kw">const</span> target = env.<span class="prop">ASPNETCORE_HTTPS_PORT</span>
+  ? <span class="str">`https://localhost:${env.ASPNETCORE_HTTPS_PORT}`</span>
+  : env.<span class="prop">ASPNETCORE_URLS</span>
+    ? env.<span class="prop">ASPNETCORE_URLS</span>.<span class="fn">split</span>(<span class="str">';'</span>)[<span class="num">0</span>]
+    : <span class="str">'https://localhost:7083'</span>;
+
+<span class="kw">const</span> PROXY_CONFIG = [{
+  context: [<span class="str">'/api/v1.0/'</span>, <span class="str">'/swagger'</span>, <span class="str">'/favicon.ico'</span>],
+  target,
+  secure: <span class="kw">false</span>
+}];
+
+module.exports = PROXY_CONFIG;</pre>
+      </div>
+
+      <div class="rule-box">
+        <div class="rule-title">📌 Punti minimi obbligatori</div>
+        <div class="rule-text">
+          1. <code>PackageReference</code> per SpaProxy nel <code>.csproj</code><br>
+          2. <code>ASPNETCORE_HOSTINGSTARTUPASSEMBLIES</code> nel <code>launchSettings.json</code><br>
+          3. <code>launch.json</code> opzionale ma consigliato per F5 coerente da VS Code
+        </div>
+      </div>
+</div>
+</body>
+</html>

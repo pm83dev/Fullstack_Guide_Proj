@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>.NET MAUI — XAML Pattern e Layout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-purple">📱</div>
+  <div>
+    <div class="section-title">.NET MAUI — XAML Pattern e Layout</div>
+    <div class="section-desc">RefreshView, CollectionView, DataTemplate, converter custom, TapGestureRecognizer, overlay loading</div>
+  </div>
+</div>
+
+<!-- Struttura pagina -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Struttura Pagina Completa — BuoniListPage</span><span class="card-tag tag-pattern">pattern</span></div>
+  <div class="card-body">
+    <div class="info-box">
+      <div class="info-title">Componenti usati</div>
+      <div class="rule-text">Grid a 3 righe (header / lista / errore), RefreshView con pull-to-refresh, CollectionView con EmptyView, DataTemplate tipato con <code>x:DataType</code>, Frame con TapGestureRecognizer, overlay di loading.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ContentPage header e Resources -->
+<div class="card">
+  <div class="card-header"><span class="card-title">ContentPage — Header e Converter Resources</span><span class="card-tag tag-action">xaml</span></div>
+  <div class="card-body">
+    <pre>&lt;ContentPage xmlns=<span class="str">"http://schemas.microsoft.com/dotnet/2021/maui"</span>
+             xmlns:x=<span class="str">"http://schemas.microsoft.com/winfx/2009/xaml"</span>
+             xmlns:vm=<span class="str">"clr-namespace:MusaniPicking.MAUI.ViewModels"</span>
+             xmlns:m=<span class="str">"clr-namespace:MusaniPicking.MAUI.Models"</span>
+             xmlns:conv=<span class="str">"clr-namespace:MusaniPicking.MAUI.Converters"</span>
+             x:Class=<span class="str">"MusaniPicking.MAUI.Views.BuoniListPage"</span>
+             x:DataType=<span class="str">"vm:BuoniListViewModel"</span>
+             Title=<span class="str">"Buoni Picking"</span>
+             BackgroundColor=<span class="str">"#F5F5F5"</span>&gt;
+
+  &lt;ContentPage.Resources&gt;
+    &lt;conv:HexColorConverter      x:Key=<span class="str">"HexColor"</span> /&gt;
+    &lt;conv:ClampDoubleConverter   x:Key=<span class="str">"Clamp"</span> /&gt;
+    &lt;conv:BoolToVisibleConverter x:Key=<span class="str">"BoolVis"</span> /&gt;
+  &lt;/ContentPage.Resources&gt;
+
+  &lt;ContentPage.ToolbarItems&gt;
+    &lt;ToolbarItem Text=<span class="str">"⚙"</span> Command=<span class="str">"{Binding VaiImpostazioniCommand}"</span>
+                 Order=<span class="str">"Primary"</span> Priority=<span class="str">"0"</span> /&gt;
+  &lt;/ContentPage.ToolbarItems&gt;
+
+  &lt;Grid RowDefinitions=<span class="str">"Auto,*,Auto"</span>&gt;
+    <span class="cmt">&lt;!-- Header, Lista, Errore --&gt;</span>
+  &lt;/Grid&gt;
+&lt;/ContentPage&gt;</pre>
+  </div>
+</div>
+
+<!-- Header frame -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Header — Frame con Grid a 2 Colonne</span><span class="card-tag tag-component">header</span></div>
+  <div class="card-body">
+    <pre>&lt;Frame Grid.Row=<span class="str">"0"</span> BackgroundColor=<span class="str">"#0057A8"</span> Padding=<span class="str">"16,10"</span>
+       CornerRadius=<span class="str">"0"</span> HasShadow=<span class="str">"False"</span>&gt;
+  &lt;Grid ColumnDefinitions=<span class="str">"*,Auto"</span>&gt;
+
+    &lt;StackLayout Grid.Column=<span class="str">"0"</span> VerticalOptions=<span class="str">"Center"</span>&gt;
+      &lt;Label Text=<span class="str">"Terminale"</span> TextColor=<span class="str">"#B3D4F5"</span> FontSize=<span class="str">"12"</span>/&gt;
+      &lt;Label Text=<span class="str">"{Binding CodTer}"</span> TextColor=<span class="str">"White"</span>
+             FontSize=<span class="str">"16"</span> FontAttributes=<span class="str">"Bold"</span>/&gt;
+    &lt;/StackLayout&gt;
+
+    &lt;Button Grid.Column=<span class="str">"1"</span>
+            Text=<span class="str">"↺ Aggiorna"</span>
+            Command=<span class="str">"{Binding CaricaBuoniCommand}"</span>
+            BackgroundColor=<span class="str">"#005099"</span>
+            TextColor=<span class="str">"White"</span> FontSize=<span class="str">"13"</span>
+            CornerRadius=<span class="str">"6"</span> Padding=<span class="str">"12,6"</span>/&gt;
+  &lt;/Grid&gt;
+&lt;/Frame&gt;</pre>
+  </div>
+</div>
+
+<!-- RefreshView + CollectionView -->
+<div class="card">
+  <div class="card-header"><span class="card-title">RefreshView + CollectionView con DataTemplate Tipato</span><span class="card-tag tag-state">lista</span></div>
+  <div class="card-body">
+    <pre>&lt;RefreshView Grid.Row=<span class="str">"1"</span>
+             Command=<span class="str">"{Binding CaricaBuoniCommand}"</span>
+             IsRefreshing=<span class="str">"{Binding IsBusy}"</span>&gt;
+
+  &lt;CollectionView ItemsSource=<span class="str">"{Binding Buoni}"</span>
+                  SelectionMode=<span class="str">"None"</span>
+                  EmptyView=<span class="str">"Nessun buono assegnato."</span>&gt;
+
+    &lt;CollectionView.ItemTemplate&gt;
+      &lt;DataTemplate x:DataType=<span class="str">"m:BuonoTestata"</span>&gt;  <span class="cmt">&lt;!-- type-safe binding --&gt;</span>
+        &lt;Grid Padding=<span class="str">"12,6"</span>&gt;
+          &lt;Frame BackgroundColor=<span class="str">"White"</span> CornerRadius=<span class="str">"8"</span>
+                 Padding=<span class="str">"0"</span> HasShadow=<span class="str">"True"</span>&gt;
+
+            &lt;Grid RowDefinitions=<span class="str">"Auto,Auto,Auto"</span> Padding=<span class="str">"14,12"</span>&gt;
+
+              <span class="cmt">&lt;!-- Riga 1: numero buono + badge stato --&gt;</span>
+              &lt;Grid Grid.Row=<span class="str">"0"</span> ColumnDefinitions=<span class="str">"*,Auto"</span>&gt;
+                &lt;Label Grid.Column=<span class="str">"0"</span> Text=<span class="str">"{Binding TitoloDisplay}"</span>
+                       FontSize=<span class="str">"15"</span> FontAttributes=<span class="str">"Bold"</span>/&gt;
+                &lt;Frame Grid.Column=<span class="str">"1"</span>
+                       BackgroundColor=<span class="str">"{Binding StatoColor,
+                                        Converter={StaticResource HexColor}}"</span>
+                       CornerRadius=<span class="str">"4"</span> Padding=<span class="str">"8,2"</span> HasShadow=<span class="str">"False"</span>&gt;
+                  &lt;Label Text=<span class="str">"{Binding StatoLabel}"</span>
+                         TextColor=<span class="str">"White"</span> FontSize=<span class="str">"11"</span> FontAttributes=<span class="str">"Bold"</span>/&gt;
+                &lt;/Frame&gt;
+              &lt;/Grid&gt;
+
+              <span class="cmt">&lt;!-- Riga 2: cliente --&gt;</span>
+              &lt;Label Grid.Row=<span class="str">"1"</span> Text=<span class="str">"{Binding RagSoc}"</span>
+                     FontSize=<span class="str">"13"</span> TextColor=<span class="str">"#555555"</span> Margin=<span class="str">"0,2,0,6"</span>/&gt;
+
+              <span class="cmt">&lt;!-- Riga 3: progress bar --&gt;</span>
+              &lt;Grid Grid.Row=<span class="str">"2"</span> RowDefinitions=<span class="str">"Auto,Auto"</span>&gt;
+                &lt;Label Text=<span class="str">"{Binding AvanzamentoLbl}"</span>
+                       FontSize=<span class="str">"12"</span> TextColor=<span class="str">"#777"</span>/&gt;
+                &lt;ProgressBar Grid.Row=<span class="str">"1"</span>
+                             Progress=<span class="str">"{Binding Progresso,
+                                        Converter={StaticResource Clamp}}"</span>
+                             ProgressColor=<span class="str">"#0057A8"</span>
+                             Margin=<span class="str">"0,4,0,0"</span>/&gt;
+              &lt;/Grid&gt;
+
+            &lt;/Grid&gt;
+
+            <span class="cmt">&lt;!-- TapGestureRecognizer con binding al ViewModel antenato --&gt;</span>
+            &lt;Frame.GestureRecognizers&gt;
+              &lt;TapGestureRecognizer
+                Command=<span class="str">"{Binding Source={RelativeSource
+                          AncestorType={x:Type vm:BuoniListViewModel}},
+                          Path=ApriDettaglioCommand}"</span>
+                CommandParameter=<span class="str">"{Binding .}"</span>/&gt;
+            &lt;/Frame.GestureRecognizers&gt;
+          &lt;/Frame&gt;
+        &lt;/Grid&gt;
+      &lt;/DataTemplate&gt;
+    &lt;/CollectionView.ItemTemplate&gt;
+  &lt;/CollectionView&gt;
+&lt;/RefreshView&gt;</pre>
+  </div>
+</div>
+
+<!-- Overlay loading + messaggio errore -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Overlay Loading + Messaggio Errore</span><span class="card-tag tag-service">UX</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">&lt;!-- Messaggio errore (riga 2 del Grid principale) --&gt;</span>
+&lt;Frame Grid.Row=<span class="str">"2"</span>
+       IsVisible=<span class="str">"{Binding ErrorMessage,
+                  Converter={StaticResource BoolVis}}"</span>
+       BackgroundColor=<span class="str">"#FFEBEE"</span> BorderColor=<span class="str">"#EF9A9A"</span>
+       Padding=<span class="str">"12,8"</span> Margin=<span class="str">"12,4"</span> CornerRadius=<span class="str">"6"</span>&gt;
+  &lt;Label Text=<span class="str">"{Binding ErrorMessage}"</span>
+         TextColor=<span class="str">"#C62828"</span> FontSize=<span class="str">"13"</span>/&gt;
+&lt;/Frame&gt;
+
+<span class="cmt">&lt;!-- Overlay semi-trasparente con spinner (4° elemento del Grid) --&gt;</span>
+&lt;Grid Grid.Row=<span class="str">"0"</span> Grid.RowSpan=<span class="str">"3"</span>
+      IsVisible=<span class="str">"{Binding IsBusy}"</span>
+      BackgroundColor=<span class="str">"#80000000"</span>&gt;
+  &lt;ActivityIndicator IsRunning=<span class="str">"{Binding IsBusy}"</span>
+                     Color=<span class="str">"White"</span>
+                     HorizontalOptions=<span class="str">"Center"</span>
+                     VerticalOptions=<span class="str">"Center"</span>/&gt;
+&lt;/Grid&gt;</pre>
+    <div class="rule-box">
+      <div class="rule-title">TapGestureRecognizer con RelativeSource</div>
+      <div class="rule-text">Dentro un DataTemplate il <code>BindingContext</code> è il singolo item (BuonoTestata). Per accedere al ViewModel usa <code>Source={RelativeSource AncestorType={x:Type vm:BuoniListViewModel}}</code>. Poi <code>CommandParameter="{Binding .}"</code> passa l'item corrente come parametro.</div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

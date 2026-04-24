@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>state</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-purple">🗄️</div>
+        <div>
+          <div class="section-title">State</div>
+          <div class="section-desc">Mantiene lo stato centrale. Gestisce le Action con @Action. Espone dati con @Selector.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">product.state.ts — struttura completa</span>
+          <span class="card-tag tag-state">state</span>
+        </div>
+        <pre>
+<span class="kw">import</span> { State, Action, StateContext, Selector } <span class="kw">from</span> <span class="str">'@ngxs/store'</span>;
+
+<span class="kw">export interface</span> <span class="cls">ProductStateModel</span> {
+  <span class="prop">products</span>: <span class="cls">IProduct</span>[];
+  <span class="prop">selectedProduct</span>: <span class="cls">IProduct</span> | <span class="kw">null</span>;
+}
+
+<span class="dec">@State</span>&lt;<span class="cls">ProductStateModel</span>&gt;({
+  name: <span class="str">'product'</span>,
+  defaults: { products: [], selectedProduct: <span class="kw">null</span> },
+})
+<span class="dec">@Injectable</span>()
+<span class="kw">export class</span> <span class="cls">ProductState</span> {
+  <span class="fn">constructor</span>(<span class="kw">private</span> <span class="prop">productService</span>: <span class="cls">ProductService</span>) {}
+
+  <span class="cmt">// 🔹 SELECTOR</span>
+  <span class="dec">@Selector</span>()
+  <span class="kw">static</span> <span class="fn">products</span>(state: <span class="cls">ProductStateModel</span>) {
+    <span class="kw">return</span> state.<span class="prop">products</span>;
+  }
+
+  <span class="cmt">// 🔹 ACTION HANDLER</span>
+  <span class="dec">@Action</span>(<span class="cls">GetProductsAction</span>)
+  <span class="fn">getProducts</span>(ctx: <span class="cls">StateContext</span>&lt;<span class="cls">ProductStateModel</span>&gt;, action: <span class="cls">GetProductsAction</span>) {
+    <span class="kw">return this</span>.<span class="prop">productService</span>.<span class="fn">getProducts</span>(action.<span class="prop">payload</span>).<span class="fn">pipe</span>(
+      <span class="fn">tap</span>((result) =&gt; {
+        ctx.<span class="fn">patchState</span>({ products: result.<span class="prop">data</span> || [] });
+      }),
+    );
+  }
+}</pre>
+      </div>
+
+      <div class="rule-box">
+        <div class="rule-title">⚠️ Errore comune</div>
+        <div class="rule-text">Il tipo generico di <code>@State&lt;T&gt;</code> e <code>StateContext&lt;T&gt;</code> deve essere lo <strong>State Model</strong>, <em>non</em> il Domain Model né la risposta API.</div>
+      </div>
+</div>
+</body>
+</html>

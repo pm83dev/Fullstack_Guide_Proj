@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>regole</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-orange">📋</div>
+        <div>
+          <div class="section-title">Regole d'oro & Best Practices</div>
+          <div class="section-desc">Le regole che si applicano sempre, a prescindere dal contesto</div>
+        </div>
+      </div>
+
+      <div class="rule-box">
+        <div class="rule-title">🔶 Regola Fastkart</div>
+        <div class="rule-text">Se un componente <strong>non fa dispatch</strong>, non deve conoscere il filtro.</div>
+      </div>
+
+      <div class="rule-box">
+        <div class="rule-title">🔶 ngModel</div>
+        <div class="rule-text"><code>[(ngModel)]</code> solo per proprietà semplici. Tutto il resto → <code>[ngModel]</code> + <code>(ngModelChange)</code>.</div>
+      </div>
+
+      <div class="rule-box">
+        <div class="rule-title">🔶 Stato UI</div>
+        <div class="rule-text">Lo stato UI (<code>showModal</code>, <code>isLoading</code>...) <strong>NON deve mai essere serializzato</strong> nello State NGXS.</div>
+      </div>
+
+      <div class="rule-box">
+        <div class="rule-title">🔶 @Input/@Output</div>
+        <div class="rule-text">In Angular i componenti si comunicano tramite <code>@Input</code>/<code>@Output</code>, non tramite props JSX. Il selettore è sempre quello definito in <code>@Component({ selector: '...' })</code>.</div>
+      </div>
+
+      <div class="rule-box">
+        <div class="rule-title">🔶 Non istanziare componenti con new</div>
+        <div class="rule-text"><code>public modal = new Modal()</code> è sbagliato. I componenti Angular li gestisce il framework, non il codice.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Checklist rapida prima del commit</span></div>
+        <table>
+          <tr><th>Check</th><th>Cosa verificare</th></tr>
+          <tr><td>@State&lt;T&gt;</td><td>T è uno StateModel, non un domain model</td></tr>
+          <tr><td>defaults</td><td>Contiene array vuoti, non oggetti singoli</td></tr>
+          <tr><td>ctx tipo</td><td>StateContext&lt;XxxStateModel&gt;, non XxxResponse</td></tr>
+          <tr><td>patchState chiavi</td><td>Le chiavi esistono nel StateModel dichiarato</td></tr>
+          <tr><td>Selector param</td><td>Il parametro è il StateModel, non il domain model</td></tr>
+          <tr><td>Modal template</td><td>Usa selettore app-modal, non &lt;Modal&gt; React</td></tr>
+          <tr><td>ng-content</td><td>Il contenuto proiettato va nel parent, non nel modal</td></tr>
+        </table>
+      </div>
+</div>
+</body>
+</html>

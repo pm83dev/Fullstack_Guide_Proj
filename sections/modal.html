@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>modal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-cyan">🪟</div>
+        <div>
+          <div class="section-title">Modal + ng-content</div>
+          <div class="section-desc">Componente generico riutilizzabile con @Input/@Output e Content Projection</div>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <div class="info-title">🧠 Come funziona</div>
+        <p><code>modal.html</code> fornisce la <strong>struttura</strong> (header, body, footer Bootstrap). <code>&lt;ng-content&gt;</code> è il <em>buco</em> in cui entra il contenuto scritto nel parent. Non usare <code>&lt;Modal&gt;</code> o <code>&lt;Modal.Header&gt;</code> — quella è sintassi React Bootstrap.</p>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">modal.ts</span><span class="card-tag tag-modal">modal</span></div>
+          <pre style="font-size:11px">
+<span class="dec">@Component</span>({
+  selector: <span class="str">'app-modal'</span>,
+  imports: [CommonModule],
+  templateUrl: <span class="str">'./modal.html'</span>,
+})
+<span class="kw">export class</span> <span class="cls">Modal</span> {
+  <span class="dec">@Input</span>()  <span class="prop">isOpen</span> = <span class="kw">false</span>;
+  <span class="dec">@Input</span>()  <span class="prop">title</span> = <span class="str">''</span>;
+  <span class="dec">@Output</span>() <span class="prop">closed</span> = <span class="kw">new</span> <span class="cls">EventEmitter</span>&lt;<span class="typ">void</span>&gt;();
+  <span class="dec">@Output</span>() <span class="prop">confirmed</span> = <span class="kw">new</span> <span class="cls">EventEmitter</span>&lt;<span class="typ">void</span>&gt;();
+
+  <span class="fn">close</span>()   { <span class="kw">this</span>.<span class="prop">closed</span>.<span class="fn">emit</span>(); }
+  <span class="fn">confirm</span>() { <span class="kw">this</span>.<span class="prop">confirmed</span>.<span class="fn">emit</span>(); }
+}</pre>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">modal.html</span><span class="card-tag tag-modal">template</span></div>
+          <pre style="font-size:11px">
+<span class="dec">@if</span> (isOpen) {
+  &lt;<span class="cls">div</span> class=<span class="str">"modal d-block"</span>&gt;
+    &lt;<span class="cls">div</span> class=<span class="str">"modal-dialog"</span>&gt;
+      &lt;<span class="cls">div</span> class=<span class="str">"modal-content"</span>&gt;
+        &lt;<span class="cls">div</span> class=<span class="str">"modal-header"</span>&gt;
+          &lt;<span class="cls">h5</span>&gt;{{title}}&lt;/<span class="cls">h5</span>&gt;
+          &lt;<span class="cls">button</span> (click)=<span class="str">"close()"</span>&gt;✕&lt;/<span class="cls">button</span>&gt;
+        &lt;/<span class="cls">div</span>&gt;
+        &lt;<span class="cls">div</span> class=<span class="str">"modal-body"</span>&gt;
+          <span class="acc">&lt;ng-content&gt;&lt;/ng-content&gt;</span>  <span class="cmt">&lt;!-- buco --&gt;</span>
+        &lt;/<span class="cls">div</span>&gt;
+        &lt;<span class="cls">div</span> class=<span class="str">"modal-footer"</span>&gt;
+          &lt;<span class="cls">button</span> (click)=<span class="str">"confirm()"</span>&gt;Salva&lt;/<span class="cls">button</span>&gt;
+        &lt;/<span class="cls">div</span>&gt;
+      &lt;/<span class="cls">div</span>&gt;
+    &lt;/<span class="cls">div</span>&gt;
+  &lt;/<span class="cls">div</span>&gt;
+  &lt;<span class="cls">div</span> class=<span class="str">"modal-backdrop fade show"</span>&gt;&lt;/<span class="cls">div</span>&gt;
+}</pre>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">data.html — utilizzo nel parent</span></div>
+        <pre>
+<span class="cmt">&lt;!-- il titolo cambia in base al mode --&gt;</span>
+&lt;<span class="cls">app-modal</span>
+  [<span class="prop">isOpen</span>]=<span class="str">"showModal"</span>
+  [<span class="prop">title</span>]=<span class="str">"modalMode === 'add' ? 'Nuovo Item' : 'Modifica Item'"</span>
+  (<span class="prop">closed</span>)=<span class="str">"showModal = false"</span>
+  (<span class="prop">confirmed</span>)=<span class="str">"saveItem()"</span>&gt;
+
+  <span class="cmt">&lt;!-- questo entra nel ng-content (modal-body) --&gt;</span>
+  <span class="dec">@if</span> (selectedItem) {
+    &lt;<span class="cls">input</span> class=<span class="str">"form-control"</span> [(<span class="prop">ngModel</span>)]=<span class="str">"selectedItem.name"</span> /&gt;
+  } @else {
+    &lt;<span class="cls">p</span>&gt;Nuovo item&lt;/<span class="cls">p</span>&gt;
+  }
+
+&lt;/<span class="cls">app-modal</span>&gt;</pre>
+      </div>
+
+      <div class="flow">
+        <div class="flow-row">
+          <span class="flow-node fn-cyan">data.html</span>
+          <span class="flow-arrow">└─</span>
+          <span class="flow-label">&lt;app-modal&gt; &lt;p&gt;contenuto&lt;/p&gt; &lt;/app-modal&gt;</span>
+        </div>
+        <div class="flow-row">
+          <span class="flow-node fn-cyan">modal.html</span>
+          <span class="flow-arrow">└─</span>
+          <span class="flow-label">&lt;ng-content&gt; ← qui appare il &lt;p&gt; di data.html</span>
+        </div>
+      </div>
+
+      <div class="rule-box">
+        <div class="rule-title">📌 Content Projection</div>
+        <div class="rule-text">Questo meccanismo si chiama <strong>Content Projection</strong>. È l'equivalente Angular dei <em>children</em> in React o degli <em>slot</em> in Vue. Il modal è generico — non sa cosa ci sarà dentro.</div>
+      </div>
+
+      <div class="rule-box">
+        <div class="rule-title">⚠️ Non fare</div>
+        <div class="rule-text"><code>public modal = new Modal()</code> — i componenti Angular non si istanziano mai con <code>new</code>.</div>
+      </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Sourcing — Pattern e Implementazione</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-orange">📜</div>
+  <div>
+    <div class="section-title">Event Sourcing — Pattern e Implementazione</div>
+    <div class="section-desc">Event, AggregateRoot, CommandHandler, EventStore generico — basato su WebDpi.Application</div>
+  </div>
+</div>
+
+<!-- Concetto -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Cos'è l'Event Sourcing</span><span class="card-tag tag-rule">concetto</span></div>
+  <div class="card-body">
+    <div class="info-box">
+      <div class="info-title">Idea centrale</div>
+      <div class="rule-text">Invece di salvare solo lo <strong>stato corrente</strong> di un'entità, si salva la <strong>sequenza di eventi</strong> che l'hanno portata in quello stato. Lo stato attuale si ricostruisce riproducendo gli eventi in ordine. Ogni operazione (create, update, delete) produce un evento immutabile con timestamp.</div>
+    </div>
+    <div class="rule-box" style="margin-top:12px">
+      <div class="rule-title">Vantaggi</div>
+      <div class="rule-text">Audit trail completo e gratuito. Possibilità di ricostruire lo stato a qualsiasi punto nel tempo. Disaccoppiamento tra scrittura (comandi) e lettura (query). Facilita event-driven architecture e CQRS.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Architettura -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Architettura — Schema dei Componenti</span><span class="card-tag tag-pattern">architettura</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">HTTP Request (POST /CreateEvent)</span>
+        ↓
+<span class="cmt">Controller</span>             ← inietta ICommands&lt;T&gt; + IEventStore&lt;T&gt;
+        ↓
+<span class="cmt">CommandHandler&lt;T&gt;</span>     ← crea evento, applica ad AggregateRoot, salva
+        ↓
+<span class="cmt">AggregateRoot</span>          ← gestisce lista UncommittedEvents
+        ↓
+<span class="cmt">IEventStore&lt;T&gt;</span>         ← salva evento (InMemory / MongoDB / Postgres)
+        ↓
+<span class="cmt">Dictionary&lt;Guid, List&lt;Event&gt;&gt;</span>   (StreamId → lista eventi in ordine)</pre>
+    <table class="prop-table" style="margin-top:12px">
+      <thead><tr><th>Componente</th><th>Responsabilità</th><th>File</th></tr></thead>
+      <tbody>
+        <tr><td><code>Event</code></td><td>Classe base immutabile con EventId, StreamId, EventType, Data</td><td>Events/Event.cs</td></tr>
+        <tr><td><code>CreatedEvent / UpdatedEvent / DeletedEvent</code></td><td>Tipi concreti di evento</td><td>Events/*.cs</td></tr>
+        <tr><td><code>AggregateRoot</code></td><td>Accumula eventi non salvati, applica logica di stato</td><td>AggregateRoot/AggregateRoot.cs</td></tr>
+        <tr><td><code>ICommands&lt;T&gt;</code></td><td>Contratto per Create/Update/Delete</td><td>Commands/ICommands.cs</td></tr>
+        <tr><td><code>CommandHandler&lt;T&gt;</code></td><td>Implementa i comandi, orchestra AggregateRoot + EventStore</td><td>Commands/CommandHandler.cs</td></tr>
+        <tr><td><code>IEventStore&lt;T&gt;</code></td><td>Contratto per salvare e leggere eventi</td><td>EventStore/IEventStore.cs</td></tr>
+        <tr><td><code>InMemoryEventStore&lt;T&gt;</code></td><td>Implementazione in memoria (sviluppo/test)</td><td>EventStore/InMemoryEventStore.cs</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- IEntity -->
+<div class="card">
+  <div class="card-header"><span class="card-title">1. IEntity — Contratto per le Entità</span><span class="card-tag tag-action">interfaccia</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// Models/IEntity.cs</span>
+<span class="kw">public interface</span> <span class="cls">IEntity</span>
+{
+    <span class="cls">Guid</span> Id { <span class="kw">get</span>; <span class="kw">set</span>; }
+}</pre>
+    <p style="color:var(--text-dim);margin-top:8px">Tutte le entità gestite dall'event store implementano questa interfaccia. Il <code>Guid Id</code> diventa il <strong>StreamId</strong>: la chiave che raggruppa tutti gli eventi relativi a quell'entità.</p>
+  </div>
+</div>
+
+<!-- Event base -->
+<div class="card">
+  <div class="card-header"><span class="card-title">2. Event — Classe Base Immutabile</span><span class="card-tag tag-state">evento</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// Events/Event.cs</span>
+<span class="kw">public abstract class</span> <span class="cls">Event</span>
+{
+    <span class="kw">public</span> <span class="cls">Guid</span>     EventId   { <span class="kw">get</span>; <span class="kw">init</span>; }  <span class="cmt">// ID univoco dell'evento</span>
+    <span class="kw">public</span> <span class="cls">Guid</span>     StreamId  { <span class="kw">get</span>; <span class="kw">init</span>; }  <span class="cmt">// ID dell'entità a cui è legato</span>
+    <span class="kw">public</span> <span class="typ">string</span>   EventType { <span class="kw">get</span>; <span class="kw">init</span>; }  <span class="cmt">// "Created" | "Updated" | "Deleted"</span>
+    <span class="kw">public</span> <span class="cls">DateTime</span> CreatedAt { <span class="kw">get</span>; <span class="kw">init</span>; } = DateTime.UtcNow;
+    <span class="kw">public</span> <span class="typ">object</span>   Data      { <span class="kw">get</span>; <span class="kw">init</span>; }  <span class="cmt">// snapshot dell'entità al momento dell'evento</span>
+
+    <span class="kw">protected</span> <span class="cls">Event</span>(<span class="cls">Guid</span> streamId, <span class="typ">string</span> eventType, <span class="typ">object</span> data)
+    {
+        StreamId  = streamId;
+        EventType = eventType;
+        Data      = data;
+        EventId   = Guid.<span class="fn">NewGuid</span>(); <span class="cmt">// ogni evento ha ID unico</span>
+    }
+}</pre>
+    <div class="info-box">
+      <div class="info-title">init invece di set</div>
+      <div class="rule-text"><code>init</code> (C# 9+) rende le proprietà <strong>immutabili dopo la costruzione</strong>: si possono valorizzare solo nel costruttore o in un object initializer. Gli eventi non devono mai cambiare dopo essere stati creati.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tipi di evento -->
+<div class="card">
+  <div class="card-header"><span class="card-title">3. Tipi di Evento Concreti</span><span class="card-tag tag-action">eventi</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// CreatedEvent — genera nuovo StreamId</span>
+<span class="kw">public class</span> <span class="cls">CreatedEvent</span> : <span class="cls">Event</span>
+{
+    <span class="kw">public</span> <span class="cls">CreatedEvent</span>(<span class="typ">object</span> data)
+        : <span class="kw">base</span>(Guid.<span class="fn">NewGuid</span>(), <span class="str">"Created"</span>, data) { }
+}
+
+<span class="cmt">// UpdatedEvent — usa l'ID esistente dell'entità</span>
+<span class="kw">public class</span> <span class="cls">UpdatedEvent</span> : <span class="cls">Event</span>
+{
+    <span class="kw">public</span> <span class="cls">UpdatedEvent</span>(<span class="cls">Guid</span> entityId, <span class="typ">object</span> updatedData)
+        : <span class="kw">base</span>(entityId, <span class="str">"Updated"</span>, updatedData) { }
+}
+
+<span class="cmt">// DeletedEvent — stesso ID, marca come eliminato</span>
+<span class="kw">public class</span> <span class="cls">DeletedEvent</span> : <span class="cls">Event</span>
+{
+    <span class="kw">public</span> <span class="cls">DeletedEvent</span>(<span class="cls">Guid</span> entityId, <span class="typ">object</span> deleteData)
+        : <span class="kw">base</span>(entityId, <span class="str">"Deleted"</span>, deleteData) { }
+}</pre>
+    <div class="rule-box">
+      <div class="rule-title">Created genera un nuovo GUID, Update/Delete riusano quello esistente</div>
+      <div class="rule-text">Il <code>StreamId</code> è la chiave che collega tutti gli eventi della stessa entità. La creazione genera un nuovo GUID; tutte le operazioni successive usano lo stesso ID per formare lo "stream" di eventi.</div>
+    </div>
+  </div>
+</div>
+
+<!-- AggregateRoot -->
+<div class="card">
+  <div class="card-header"><span class="card-title">4. AggregateRoot — Buffer degli Uncommitted Events</span><span class="card-tag tag-state">aggregate</span></div>
+  <div class="card-body">
+    <pre><span class="kw">public class</span> <span class="cls">AggregateRoot</span>
+{
+    <span class="kw">public</span> <span class="cls">Guid</span>     streamId  { <span class="kw">get</span>; <span class="kw">private set</span>; }
+    <span class="kw">public</span> <span class="cls">DateTime</span> CreatedAt { <span class="kw">get</span>; <span class="kw">private set</span>; }
+
+    <span class="kw">private readonly</span> <span class="cls">List</span>&lt;<span class="cls">Event</span>&gt; _uncommittedEvents = <span class="kw">new</span>();
+    <span class="kw">public</span> <span class="cls">IEnumerable</span>&lt;<span class="cls">Event</span>&gt; UncommittedEvents => _uncommittedEvents;
+
+    <span class="cmt">// Applica l'evento e lo aggiunge alla lista uncommitted</span>
+    <span class="kw">public void</span> <span class="fn">ApplyEvent</span>(<span class="cls">Event</span> @event)
+    {
+        <span class="kw">switch</span> (@event)
+        {
+            <span class="kw">case</span> <span class="cls">CreatedEvent</span> e:  <span class="fn">Apply</span>(e); <span class="kw">break</span>;
+            <span class="kw">case</span> <span class="cls">UpdatedEvent</span> e:  <span class="fn">Apply</span>(e); <span class="kw">break</span>;
+            <span class="kw">case</span> <span class="cls">DeletedEvent</span> e:  <span class="fn">Apply</span>(e); <span class="kw">break</span>;
+            <span class="kw">default</span>: <span class="kw">throw new</span> <span class="cls">ArgumentException</span>(<span class="str">$"Tipo evento non gestito: {@event.GetType().Name}"</span>);
+        }
+        _uncommittedEvents.<span class="fn">Add</span>(@event);
+    }
+
+    <span class="kw">private void</span> <span class="fn">Apply</span>(<span class="cls">CreatedEvent</span> e) { streamId = e.StreamId; CreatedAt = e.CreatedAt; }
+    <span class="kw">private void</span> <span class="fn">Apply</span>(<span class="cls">UpdatedEvent</span> e) { streamId = e.StreamId; CreatedAt = e.CreatedAt; }
+    <span class="kw">private void</span> <span class="fn">Apply</span>(<span class="cls">DeletedEvent</span> e) { streamId = e.StreamId; CreatedAt = e.CreatedAt; }
+
+    <span class="cmt">// Dopo il salvataggio: svuota il buffer</span>
+    <span class="kw">public void</span> <span class="fn">ClearUncommittedEvents</span>() => _uncommittedEvents.<span class="fn">Clear</span>();
+}</pre>
+    <div class="info-box">
+      <div class="info-title">Perché il buffer UncommittedEvents?</div>
+      <div class="rule-text">Il pattern permette di applicare più eventi all'aggregato e poi salvarli tutti insieme in modo transazionale. Finché non chiami <code>SaveEventStoreAsync</code>, gli eventi sono solo in memoria. Dopo il salvataggio si chiama <code>ClearUncommittedEvents()</code> per resettare.</div>
+    </div>
+  </div>
+</div>
+
+<!-- IEventStore -->
+<div class="card">
+  <div class="card-header"><span class="card-title">5. IEventStore&lt;T&gt; — Contratto Generico</span><span class="card-tag tag-service">interfaccia</span></div>
+  <div class="card-body">
+    <pre><span class="kw">public interface</span> <span class="cls">IEventStore</span>&lt;<span class="cls">TEntity</span>&gt; <span class="kw">where</span> <span class="cls">TEntity</span> : <span class="cls">IEntity</span>
+{
+    <span class="cmt">// Salva un singolo evento</span>
+    <span class="cls">Task</span> <span class="fn">SaveEventStoreAsync</span>(<span class="cls">Event</span> @event);
+
+    <span class="cmt">// Restituisce l'ultimo stato di tutte le entità</span>
+    <span class="cls">Task</span>&lt;<span class="cls">IEnumerable</span>&lt;<span class="cls">TEntity</span>&gt;&gt; <span class="fn">GetAllItem</span>();
+
+    <span class="cmt">// Restituisce la cronologia completa di un'entità</span>
+    <span class="cls">Task</span>&lt;<span class="cls">IEnumerable</span>&lt;<span class="cls">Event</span>&gt;&gt; <span class="fn">GetEventsByIdAsync</span>(<span class="cls">Guid</span> streamId);
+}</pre>
+  </div>
+</div>
+
+<!-- InMemoryEventStore -->
+<div class="card">
+  <div class="card-header"><span class="card-title">6. InMemoryEventStore&lt;T&gt; — Implementazione In Memoria</span><span class="card-tag tag-pattern">implementazione</span></div>
+  <div class="card-body">
+    <pre><span class="kw">public class</span> <span class="cls">InMemoryEventStore</span>&lt;<span class="cls">TEntity</span>&gt; : <span class="cls">IEventStore</span>&lt;<span class="cls">TEntity</span>&gt;
+    <span class="kw">where</span> <span class="cls">TEntity</span> : <span class="kw">class</span>, <span class="cls">IEntity</span>
+{
+    <span class="cmt">// Dizionario: StreamId → lista ordinata di eventi</span>
+    <span class="kw">private readonly</span> <span class="cls">Dictionary</span>&lt;<span class="cls">Guid</span>, <span class="cls">List</span>&lt;<span class="cls">Event</span>&gt;&gt; _eventStore = <span class="kw">new</span>();
+
+    <span class="kw">public</span> <span class="cls">Task</span> <span class="fn">SaveEventStoreAsync</span>(<span class="cls">Event</span> @event)
+    {
+        <span class="kw">if</span> (!_eventStore.<span class="fn">ContainsKey</span>(@event.StreamId))
+            _eventStore.<span class="fn">Add</span>(@event.StreamId, <span class="kw">new</span> <span class="cls">List</span>&lt;<span class="cls">Event</span>&gt;());
+
+        _eventStore[@event.StreamId].<span class="fn">Add</span>(@event);
+        <span class="kw">return</span> Task.CompletedTask;
+    }
+
+    <span class="cmt">// Ricostruisce lo stato corrente: prende l'ultimo evento per ogni StreamId</span>
+    <span class="kw">public</span> <span class="cls">Task</span>&lt;<span class="cls">IEnumerable</span>&lt;<span class="cls">TEntity</span>&gt;&gt; <span class="fn">GetAllItem</span>()
+    {
+        <span class="kw">var</span> entities = _eventStore.Values
+            .<span class="fn">SelectMany</span>(events => events)
+            .<span class="fn">GroupBy</span>(e => e.StreamId)
+            .<span class="fn">Select</span>(group => group
+                .<span class="fn">OrderByDescending</span>(e => e.CreatedAt)
+                .<span class="fn">FirstOrDefault</span>())          <span class="cmt">// ultimo evento = stato corrente</span>
+            .<span class="fn">Select</span>(@event => @event?.Data <span class="kw">as</span> <span class="cls">TEntity</span>)
+            .<span class="fn">Where</span>(entity => entity != <span class="kw">null</span>)
+            .<span class="fn">Select</span>(entity => entity!)
+            .<span class="fn">ToList</span>();
+
+        <span class="kw">return</span> Task.<span class="fn">FromResult</span>&lt;<span class="cls">IEnumerable</span>&lt;<span class="cls">TEntity</span>&gt;&gt;(entities);
+    }
+
+    <span class="cmt">// Restituisce TUTTI gli eventi di un'entità (cronologia completa)</span>
+    <span class="kw">public</span> <span class="cls">Task</span>&lt;<span class="cls">IEnumerable</span>&lt;<span class="cls">Event</span>&gt;&gt; <span class="fn">GetEventsByIdAsync</span>(<span class="cls">Guid</span> streamId)
+    {
+        <span class="kw">if</span> (!_eventStore.<span class="fn">ContainsKey</span>(streamId))
+            <span class="kw">return</span> Task.<span class="fn">FromResult</span>(Enumerable.<span class="fn">Empty</span>&lt;<span class="cls">Event</span>&gt;());
+
+        <span class="kw">return</span> Task.<span class="fn">FromResult</span>(_eventStore[streamId].<span class="fn">AsEnumerable</span>());
+    }
+}</pre>
+  </div>
+</div>
+
+<!-- CommandHandler -->
+<div class="card">
+  <div class="card-header"><span class="card-title">7. CommandHandler&lt;T&gt; — Orchestratore</span><span class="card-tag tag-service">command</span></div>
+  <div class="card-body">
+    <pre><span class="kw">public class</span> <span class="cls">CommandHandler</span>&lt;<span class="cls">TEntity</span>&gt; : <span class="cls">ICommands</span>&lt;<span class="cls">TEntity</span>&gt;
+    <span class="kw">where</span> <span class="cls">TEntity</span> : <span class="cls">IEntity</span>
+{
+    <span class="kw">private readonly</span> <span class="cls">IEventStore</span>&lt;<span class="cls">TEntity</span>&gt; _eventStore;
+
+    <span class="kw">public</span> <span class="cls">CommandHandler</span>(<span class="cls">IEventStore</span>&lt;<span class="cls">TEntity</span>&gt; eventStore)
+        => _eventStore = eventStore;
+
+    <span class="kw">public async</span> <span class="cls">Task</span> <span class="fn">HandleCreateAsync</span>(<span class="cls">TEntity</span> entity)
+    {
+        <span class="kw">if</span> (entity.Id == Guid.Empty)
+            entity.Id = Guid.<span class="fn">NewGuid</span>(); <span class="cmt">// assegna ID se mancante</span>
+
+        <span class="kw">var</span> @event = <span class="kw">new</span> <span class="cls">CreatedEvent</span>(entity) { StreamId = entity.Id };
+
+        <span class="kw">var</span> aggregate = <span class="kw">new</span> <span class="cls">AggregateRoot</span>();
+        aggregate.<span class="fn">ApplyEvent</span>(@event);
+
+        <span class="kw">foreach</span> (<span class="kw">var</span> e <span class="kw">in</span> aggregate.UncommittedEvents)
+            <span class="kw">await</span> _eventStore.<span class="fn">SaveEventStoreAsync</span>(e);
+
+        aggregate.<span class="fn">ClearUncommittedEvents</span>();
+    }
+
+    <span class="kw">public async</span> <span class="cls">Task</span> <span class="fn">HandleUpdateAsync</span>(<span class="cls">TEntity</span> entity)
+    {
+        <span class="kw">var</span> @event = <span class="kw">new</span> <span class="cls">UpdatedEvent</span>(entity.Id, entity);
+
+        <span class="kw">var</span> aggregate = <span class="kw">new</span> <span class="cls">AggregateRoot</span>();
+        aggregate.<span class="fn">ApplyEvent</span>(@event);
+
+        <span class="kw">foreach</span> (<span class="kw">var</span> e <span class="kw">in</span> aggregate.UncommittedEvents)
+            <span class="kw">await</span> _eventStore.<span class="fn">SaveEventStoreAsync</span>(e);
+
+        aggregate.<span class="fn">ClearUncommittedEvents</span>();
+    }
+
+    <span class="kw">public async</span> <span class="cls">Task</span> <span class="fn">HandleDeleteAsync</span>(<span class="cls">TEntity</span> entity)
+    {
+        <span class="kw">var</span> @event = <span class="kw">new</span> <span class="cls">DeletedEvent</span>(entity.Id, entity);
+
+        <span class="kw">var</span> aggregate = <span class="kw">new</span> <span class="cls">AggregateRoot</span>();
+        aggregate.<span class="fn">ApplyEvent</span>(@event);
+
+        <span class="kw">foreach</span> (<span class="kw">var</span> e <span class="kw">in</span> aggregate.UncommittedEvents)
+            <span class="kw">await</span> _eventStore.<span class="fn">SaveEventStoreAsync</span>(e);
+
+        aggregate.<span class="fn">ClearUncommittedEvents</span>();
+    }
+}</pre>
+  </div>
+</div>
+
+<!-- Controller -->
+<div class="card">
+  <div class="card-header"><span class="card-title">8. Controller — Endpoint Create / Update / GetEvents</span><span class="card-tag tag-component">controller</span></div>
+  <div class="card-body">
+    <pre>[<span class="cls">ApiController</span>]
+[<span class="cls">Route</span>(<span class="str">"[controller]"</span>)]
+<span class="kw">public class</span> <span class="cls">UtensiliController</span> : <span class="cls">ControllerBase</span>
+{
+    <span class="kw">private readonly</span> <span class="cls">ICommands</span>&lt;<span class="cls">Utensile</span>&gt;   _commandHandler;
+    <span class="kw">private readonly</span> <span class="cls">IEventStore</span>&lt;<span class="cls">Utensile</span>&gt; _eventStore;
+    <span class="kw">private readonly</span> <span class="cls">IUtensiliService</span>      _service;
+
+    <span class="cmt">// POST /Utensili/CreateEvent</span>
+    [<span class="cls">HttpPost</span>(<span class="str">"CreateEvent"</span>)]
+    <span class="kw">public async</span> &lt;<span class="cls">IActionResult</span>&gt; <span class="fn">AddDpiEvent</span>(<span class="cls">Utensile</span> utensile)
+    {
+        <span class="kw">await</span> _commandHandler.<span class="fn">HandleCreateAsync</span>(utensile);
+        <span class="kw">return</span> <span class="fn">Ok</span>(utensile);
+    }
+
+    <span class="cmt">// PUT /Utensili/UpdateEvent/{id}</span>
+    [<span class="cls">HttpPut</span>(<span class="str">"UpdateEvent/{dpi}"</span>)]
+    <span class="kw">public async</span> &lt;<span class="cls">IActionResult</span>&gt; <span class="fn">UpdateDpiEvent</span>(<span class="cls">Utensile</span> utensile)
+    {
+        <span class="kw">await</span> _commandHandler.<span class="fn">HandleUpdateAsync</span>(utensile);
+        <span class="kw">return</span> <span class="fn">Ok</span>(utensile);
+    }
+
+    <span class="cmt">// GET /Utensili/GetAllDpis — stato corrente + eventi store</span>
+    [<span class="cls">HttpGet</span>(<span class="str">"GetAllDpis"</span>)]
+    <span class="kw">public async</span> &lt;<span class="cls">IActionResult</span>&gt; <span class="fn">GetAllEvents</span>()
+    {
+        <span class="kw">var</span> utensili       = <span class="kw">await</span> _service.<span class="fn">GetAllUtensili</span>();     <span class="cmt">// da DB relazionale</span>
+        <span class="kw">var</span> utensiliEvents = <span class="kw">await</span> _eventStore.<span class="fn">GetAllItem</span>();     <span class="cmt">// da event store</span>
+        <span class="kw">return</span> <span class="fn">Ok</span>(<span class="kw">new</span> { Utensili = utensili, UtensiliEvents = utensiliEvents });
+    }
+
+    <span class="cmt">// GET /Utensili/{id}/events — cronologia completa di un'entità</span>
+    [<span class="cls">HttpGet</span>(<span class="str">"{dpiId}/events"</span>)]
+    <span class="kw">public async</span> &lt;<span class="cls">IActionResult</span>&gt; <span class="fn">GetDpiEvents</span>(<span class="cls">Guid</span> dpiId)
+    {
+        <span class="kw">var</span> events = <span class="kw">await</span> _eventStore.<span class="fn">GetEventsByIdAsync</span>(dpiId);
+        <span class="kw">if</span> (!events.<span class="fn">Any</span>()) <span class="kw">return</span> <span class="fn">NotFound</span>();
+        <span class="kw">return</span> <span class="fn">Ok</span>(events);
+    }
+}</pre>
+  </div>
+</div>
+
+<!-- ServiceCollection -->
+<div class="card">
+  <div class="card-header"><span class="card-title">9. Registrazione DI — Generici con typeof()</span><span class="card-tag tag-service">DI</span></div>
+  <div class="card-body">
+    <pre><span class="kw">public static</span> <span class="cls">IServiceCollection</span> <span class="fn">InjectApplicationServices</span>(
+    <span class="kw">this</span> <span class="cls">IServiceCollection</span> self)
+{
+    <span class="cmt">// Registrazione generica open — funziona per qualsiasi TEntity</span>
+    self.<span class="fn">AddScoped</span>(<span class="kw">typeof</span>(<span class="cls">ICommands</span>&lt;&gt;),    <span class="kw">typeof</span>(<span class="cls">CommandHandler</span>&lt;&gt;));
+    self.<span class="fn">AddSingleton</span>(<span class="kw">typeof</span>(<span class="cls">IEventStore</span>&lt;&gt;), <span class="kw">typeof</span>(<span class="cls">InMemoryEventStore</span>&lt;&gt;));
+
+    <span class="cmt">// Servizi applicativi normali</span>
+    self.<span class="fn">AddScoped</span>&lt;<span class="cls">IOperatorService</span>,  <span class="cls">OperatorService</span>&gt;();
+    self.<span class="fn">AddScoped</span>&lt;<span class="cls">IUtensiliService</span>,  <span class="cls">UtensiliService</span>&gt;();
+    self.<span class="fn">AddScoped</span>&lt;<span class="cls">INoleggiService</span>,   <span class="cls">NoleggiService</span>&gt;();
+    self.<span class="fn">AddScoped</span>&lt;<span class="cls">IRepository</span>,       <span class="cls">RepoPostgres</span>&gt;();
+
+    <span class="cmt">// Implementazioni alternative (commenta/decommenta per cambiare backend)</span>
+    <span class="cmt">// self.AddSingleton&lt;IDpiRepo, DpiRepoInMemory&gt;();  // test in memory</span>
+    <span class="cmt">// self.AddSingleton&lt;IDpiRepo, MongoDBService&gt;();   // MongoDB produzione</span>
+
+    <span class="kw">return</span> self;
+}</pre>
+    <div class="rule-box">
+      <div class="rule-title">typeof() per generici open</div>
+      <div class="rule-text"><code>typeof(IEventStore&lt;&gt;)</code> con le parentesi angolari vuote registra il tipo generico aperto. Angular DI risolve automaticamente <code>IEventStore&lt;Utensile&gt;</code>, <code>IEventStore&lt;Operatore&gt;</code> ecc. senza dover registrare ogni combinazione separatamente.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Value Objects -->
+<div class="card">
+  <div class="card-header"><span class="card-title">10. Value Object — Record Immutabili con Validazione</span><span class="card-tag tag-pattern">DDD</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// ValueObject/ValueObjectDpi.cs</span>
+<span class="cmt">// Ogni VO è un record con validazione nel costruttore</span>
+
+<span class="kw">public record</span> <span class="cls">Name</span>
+{
+    <span class="kw">public</span> <span class="typ">string</span> Value { <span class="kw">get</span>; }
+
+    <span class="kw">public</span> <span class="cls">Name</span>(<span class="typ">string</span> value)
+    {
+        <span class="kw">if</span> (<span class="typ">string</span>.<span class="fn">IsNullOrWhiteSpace</span>(value))
+            <span class="kw">throw new</span> <span class="cls">ArgumentException</span>(<span class="str">"Il nome non può essere vuoto"</span>);
+        Value = value;
+    }
+
+    <span class="kw">public override</span> <span class="typ">string</span> <span class="fn">ToString</span>() => Value;
+}
+
+<span class="cmt">// Stesso pattern per: Surname, Role, Username, Password,</span>
+<span class="cmt">// Email, Phone, Address, Code, Description</span>
+
+<span class="cmt">// Per date con validazione</span>
+<span class="kw">public record</span> <span class="cls">AssignmentDate</span>
+{
+    <span class="kw">public</span> <span class="cls">DateOnly</span> Value { <span class="kw">get</span>; }
+
+    <span class="kw">public</span> <span class="cls">AssignmentDate</span>(<span class="cls">DateOnly</span> value)
+    {
+        <span class="cmt">// validazione: data non nel futuro</span>
+        Value = value;
+    }
+}</pre>
+    <div class="info-box">
+      <div class="info-title">Perché record e non class?</div>
+      <div class="rule-text">I <code>record</code> in C# hanno uguaglianza strutturale per default (<code>Name("Mario") == Name("Mario")</code>), sono immutabili se usi solo proprietà <code>get</code>, e si stampano bene. Perfetti per Value Objects nel Domain-Driven Design.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Flusso completo -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Flusso Completo — Da HTTP a Event Store</span><span class="card-tag tag-rule">workflow</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">POST /Utensili/CreateEvent  { ...dati utensile... }</span>
+        ↓
+<span class="cls">UtensiliController</span>.<span class="fn">AddDpiEvent</span>(utensile)
+        ↓
+<span class="cls">CommandHandler</span>&lt;<span class="cls">Utensile</span>&gt;.<span class="fn">HandleCreateAsync</span>(utensile)
+  1. entity.Id = Guid.<span class="fn">NewGuid</span>()           <span class="cmt">← genera StreamId</span>
+  2. <span class="kw">new</span> <span class="cls">CreatedEvent</span>(entity)             <span class="cmt">← crea evento immutabile</span>
+  3. aggregate.<span class="fn">ApplyEvent</span>(createdEvent)   <span class="cmt">← aggiorna stato aggregato</span>
+  4. _eventStore.<span class="fn">SaveEventStoreAsync</span>(e)   <span class="cmt">← persiste in Dictionary</span>
+  5. aggregate.<span class="fn">ClearUncommittedEvents</span>()   <span class="cmt">← reset buffer</span>
+        ↓
+<span class="cmt">GET /Utensili/{id}/events</span>
+  → _eventStore.<span class="fn">GetEventsByIdAsync</span>(id)
+  → restituisce tutti gli eventi in ordine cronologico:
+    [CreatedEvent, UpdatedEvent, UpdatedEvent, ...]</pre>
+  </div>
+</div>
+
+<!-- Estendere con MongoDB/Postgres -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Estendere — Da InMemory a MongoDB o PostgreSQL</span><span class="card-tag tag-pattern">produzione</span></div>
+  <div class="card-body">
+    <p style="color:var(--text-dim);margin-bottom:12px">Basta implementare <code>IEventStore&lt;T&gt;</code> con un nuovo backend e cambiare la registrazione DI. Il resto del codice non cambia.</p>
+    <pre><span class="cmt">// EventStore/MongoEventStore.cs</span>
+<span class="kw">public class</span> <span class="cls">MongoEventStore</span>&lt;<span class="cls">TEntity</span>&gt; : <span class="cls">IEventStore</span>&lt;<span class="cls">TEntity</span>&gt;
+    <span class="kw">where</span> <span class="cls">TEntity</span> : <span class="kw">class</span>, <span class="cls">IEntity</span>
+{
+    <span class="kw">private readonly</span> <span class="cls">IMongoCollection</span>&lt;<span class="cls">EventDocument</span>&gt; _collection;
+
+    <span class="kw">public async</span> <span class="cls">Task</span> <span class="fn">SaveEventStoreAsync</span>(<span class="cls">Event</span> @event)
+    {
+        <span class="kw">var</span> doc = <span class="kw">new</span> <span class="cls">EventDocument</span>
+        {
+            EventId   = @event.EventId,
+            StreamId  = @event.StreamId,
+            EventType = @event.EventType,
+            CreatedAt = @event.CreatedAt,
+            Data      = BsonDocument.<span class="fn">Parse</span>(JsonSerializer.<span class="fn">Serialize</span>(@event.Data))
+        };
+        <span class="kw">await</span> _collection.<span class="fn">InsertOneAsync</span>(doc);
+    }
+
+    <span class="cmt">// ... implementa GetAllItem() e GetEventsByIdAsync()</span>
+}
+
+<span class="cmt">// ServiceCollection: cambia solo questa riga</span>
+self.<span class="fn">AddSingleton</span>(<span class="kw">typeof</span>(<span class="cls">IEventStore</span>&lt;&gt;), <span class="kw">typeof</span>(<span class="cls">MongoEventStore</span>&lt;&gt;));</pre>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

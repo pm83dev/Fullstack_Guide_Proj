@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Angular 20+ Standalone — Setup Completo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-red">🅰</div>
+  <div>
+    <div class="section-title">Angular 20+ Standalone — Setup Completo</div>
+    <div class="section-desc">Progetto Angular standalone + NGXS + routing + integrazione .NET — dalla creazione al deploy</div>
+  </div>
+</div>
+
+<!-- Creazione progetto -->
+<div class="card">
+  <div class="card-header"><span class="card-title">1 — Creazione Progetto Angular</span><span class="card-tag tag-service">setup</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Angular 17+ usa standalone di default</span>
+ng new angular-ngxs-demo --standalone --routing --style=scss
+cd angular-ngxs-demo
+ng serve
+
+<span class="cmt"># Verifica versione Angular</span>
+ng version
+
+<span class="cmt"># Struttura base generata</span>
+src/app/
+  app.config.ts       <span class="cmt"># configurazione globale (sostituisce AppModule)</span>
+  app.routes.ts       <span class="cmt"># routing</span>
+  app.ts              <span class="cmt"># componente root (Angular 21: App, non AppComponent)</span></pre>
+  </div>
+</div>
+
+<!-- NGXS install -->
+<div class="card">
+  <div class="card-header"><span class="card-title">2 — Installazione NGXS</span><span class="card-tag tag-action">install</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Pacchetti base + plugin consigliati</span>
+npm install @ngxs/store @ngxs/devtools-plugin @ngxs/logger-plugin
+
+<span class="cmt"># Se usi Angular 21: zone.js va installato esplicitamente</span>
+npm install zone.js</pre>
+  </div>
+</div>
+
+<!-- app.config.ts -->
+<div class="card">
+  <div class="card-header"><span class="card-title">3 — app.config.ts — Configurazione Globale</span><span class="card-tag tag-state">config</span></div>
+  <div class="card-body">
+    <pre><span class="kw">import</span> { <span class="cls">ApplicationConfig</span>, <span class="cls">provideZoneChangeDetection</span> } <span class="kw">from</span> <span class="str">'@angular/core'</span>;
+<span class="kw">import</span> { <span class="cls">provideRouter</span> } <span class="kw">from</span> <span class="str">'@angular/router'</span>;
+<span class="kw">import</span> { <span class="cls">provideHttpClient</span> } <span class="kw">from</span> <span class="str">'@angular/common/http'</span>;
+<span class="kw">import</span> { <span class="cls">provideStore</span> } <span class="kw">from</span> <span class="str">'@ngxs/store'</span>;
+<span class="kw">import</span> { <span class="cls">provideNgxsDevtoolsPlugin</span> } <span class="kw">from</span> <span class="str">'@ngxs/devtools-plugin'</span>;
+<span class="kw">import</span> { <span class="cls">provideNgxsLoggerPlugin</span> } <span class="kw">from</span> <span class="str">'@ngxs/logger-plugin'</span>;
+<span class="kw">import</span> { <span class="cls">routes</span> } <span class="kw">from</span> <span class="str">'./app.routes'</span>;
+<span class="kw">import</span> { <span class="cls">UserState</span> } <span class="kw">from</span> <span class="str">'./store/user.state'</span>;
+
+<span class="kw">export const</span> appConfig: <span class="cls">ApplicationConfig</span> = {
+  providers: [
+    <span class="fn">provideZoneChangeDetection</span>({ eventCoalescing: <span class="kw">true</span> }),
+    <span class="fn">provideRouter</span>(routes),
+    <span class="fn">provideHttpClient</span>(),             <span class="cmt">// obbligatorio per HttpClient nei service</span>
+    <span class="fn">provideStore</span>(
+      [<span class="cls">UserState</span>],                    <span class="cmt">// aggiungi ogni State qui</span>
+      <span class="fn">provideNgxsDevtoolsPlugin</span>(),    <span class="cmt">// Redux DevTools nel browser</span>
+      <span class="fn">provideNgxsLoggerPlugin</span>()       <span class="cmt">// log di ogni action in console</span>
+    )
+  ]
+};</pre>
+  </div>
+</div>
+
+<!-- Modello, Actions, State completo -->
+<div class="card">
+  <div class="card-header"><span class="card-title">4 — Model, Actions e State</span><span class="card-tag tag-state">state</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// models/product.model.ts</span>
+<span class="kw">export interface</span> <span class="cls">Product</span> {
+  id: <span class="typ">number</span>; name: <span class="typ">string</span>; price: <span class="typ">number</span>; description: <span class="typ">string</span>;
+}
+<span class="kw">export interface</span> <span class="cls">ProductStateModel</span> {
+  products: <span class="cls">Product</span>[]; loading: <span class="typ">boolean</span>; error: <span class="typ">any</span>;
+}
+
+<span class="cmt">// store/product.actions.ts</span>
+<span class="kw">export class</span> <span class="cls">LoadProducts</span> {
+  <span class="kw">static readonly</span> type = <span class="str">'[Products] Load'</span>;
+}
+<span class="kw">export class</span> <span class="cls">LoadProductsSuccess</span> {
+  <span class="kw">static readonly</span> type = <span class="str">'[Products] Load Success'</span>;
+  <span class="fn">constructor</span>(<span class="kw">public</span> products: <span class="cls">Product</span>[]) {}
+}
+<span class="kw">export class</span> <span class="cls">LoadProductsFail</span> {
+  <span class="kw">static readonly</span> type = <span class="str">'[Products] Load Fail'</span>;
+  <span class="fn">constructor</span>(<span class="kw">public</span> error: <span class="typ">any</span>) {}
+}
+
+<span class="cmt">// store/product.state.ts</span>
+<span class="dec">@State</span>&lt;<span class="cls">ProductStateModel</span>&gt;({
+  name: <span class="str">'products'</span>,
+  defaults: { products: [], loading: <span class="kw">false</span>, error: <span class="kw">null</span> }
+})
+<span class="dec">@Injectable</span>()
+<span class="kw">export class</span> <span class="cls">ProductState</span> {
+  <span class="fn">constructor</span>(<span class="kw">private</span> svc: <span class="cls">ProductService</span>) {}
+
+  <span class="dec">@Selector</span>() <span class="kw">static</span> <span class="fn">products</span>(s: <span class="cls">ProductStateModel</span>) { <span class="kw">return</span> s.products; }
+  <span class="dec">@Selector</span>() <span class="kw">static</span> <span class="fn">loading</span>(s: <span class="cls">ProductStateModel</span>) { <span class="kw">return</span> s.loading; }
+
+  <span class="dec">@Action</span>(<span class="cls">LoadProducts</span>)
+  <span class="fn">load</span>(ctx: <span class="cls">StateContext</span>&lt;<span class="cls">ProductStateModel</span>&gt;) {
+    ctx.<span class="fn">patchState</span>({ loading: <span class="kw">true</span>, error: <span class="kw">null</span> });
+    <span class="kw">return</span> this.svc.<span class="fn">getProducts</span>().pipe(
+      <span class="fn">tap</span>(p => ctx.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">LoadProductsSuccess</span>(p))),
+      <span class="fn">catchError</span>(e => <span class="fn">of</span>(ctx.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">LoadProductsFail</span>(e))))
+    );
+  }
+
+  <span class="dec">@Action</span>(<span class="cls">LoadProductsSuccess</span>)
+  <span class="fn">success</span>(ctx: <span class="cls">StateContext</span>&lt;<span class="cls">ProductStateModel</span>&gt;, a: <span class="cls">LoadProductsSuccess</span>) {
+    ctx.<span class="fn">patchState</span>({ products: a.products, loading: <span class="kw">false</span> });
+  }
+
+  <span class="dec">@Action</span>(<span class="cls">LoadProductsFail</span>)
+  <span class="fn">fail</span>(ctx: <span class="cls">StateContext</span>&lt;<span class="cls">ProductStateModel</span>&gt;, a: <span class="cls">LoadProductsFail</span>) {
+    ctx.<span class="fn">patchState</span>({ error: a.error, loading: <span class="kw">false</span> });
+  }
+}</pre>
+  </div>
+</div>
+
+<!-- Componenti standalone con routing -->
+<div class="card">
+  <div class="card-header"><span class="card-title">5 — Componenti Standalone + Routing</span><span class="card-tag tag-component">component</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// Lista prodotti</span>
+<span class="dec">@Component</span>({
+  standalone: <span class="kw">true</span>,
+  imports: [<span class="cls">CommonModule</span>, <span class="cls">RouterModule</span>],
+  template: <span class="str">`
+    &lt;div *ngIf="loading$ | async"&gt;Caricamento...&lt;/div&gt;
+    &lt;ul *ngIf="(products$ | async) as products"&gt;
+      &lt;li *ngFor="let p of products"&gt;
+        &lt;a [routerLink]="['/products', p.id]"&gt;
+          {{ p.name }} — {{ p.price | currency }}
+        &lt;/a&gt;
+      &lt;/li&gt;
+    &lt;/ul&gt;
+  `</span>
+})
+<span class="kw">export class</span> <span class="cls">ProductListComponent</span> <span class="kw">implements</span> <span class="cls">OnInit</span> {
+  products$ = this.store.<span class="fn">select</span>(<span class="cls">ProductState</span>.products);
+  loading$  = this.store.<span class="fn">select</span>(<span class="cls">ProductState</span>.loading);
+
+  <span class="fn">constructor</span>(<span class="kw">private</span> store: <span class="cls">Store</span>) {}
+  <span class="fn">ngOnInit</span>() { this.store.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">LoadProducts</span>()); }
+}
+
+<span class="cmt">// Dettaglio prodotto — legge id dalla rotta + filtra dallo store</span>
+<span class="dec">@Component</span>({ standalone: <span class="kw">true</span>, imports: [<span class="cls">CommonModule</span>, <span class="cls">RouterModule</span>], template: <span class="str">`...`</span> })
+<span class="kw">export class</span> <span class="cls">ProductDetailComponent</span> <span class="kw">implements</span> <span class="cls">OnInit</span> {
+  product$: <span class="cls">Observable</span>&lt;<span class="cls">Product</span> | <span class="typ">undefined</span>&gt;;
+
+  <span class="fn">constructor</span>(<span class="kw">private</span> route: <span class="cls">ActivatedRoute</span>, <span class="kw">private</span> store: <span class="cls">Store</span>) {}
+
+  <span class="fn">ngOnInit</span>() {
+    this.product$ = this.route.paramMap.pipe(
+      <span class="fn">switchMap</span>(params => {
+        <span class="kw">const</span> id = <span class="fn">Number</span>(params.<span class="fn">get</span>(<span class="str">'id'</span>));
+        <span class="kw">return</span> this.store.<span class="fn">select</span>(<span class="cls">ProductState</span>.products).pipe(
+          <span class="fn">map</span>(products => products.<span class="fn">find</span>(p => p.id === id))
+        );
+      })
+    );
+  }
+}
+
+<span class="cmt">// app.routes.ts</span>
+<span class="kw">export const</span> routes: <span class="cls">Routes</span> = [
+  { path: <span class="str">''</span>, redirectTo: <span class="str">'/products'</span>, pathMatch: <span class="str">'full'</span> },
+  { path: <span class="str">'products'</span>, component: <span class="cls">ProductListComponent</span> },
+  { path: <span class="str">'products/:id'</span>, component: <span class="cls">ProductDetailComponent</span> },
+  { path: <span class="str">'**'</span>, redirectTo: <span class="str">'/products'</span> }
+];</pre>
+  </div>
+</div>
+
+<!-- Proxy Angular dev -->
+<div class="card">
+  <div class="card-header"><span class="card-title">6 — Proxy Angular per Sviluppo Locale</span><span class="card-tag tag-pattern">proxy</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// proxy.conf.json — redirige /api verso il backend .NET</span>
+{
+  <span class="str">"/api"</span>: {
+    <span class="str">"target"</span>: <span class="str">"https://localhost:5001"</span>,
+    <span class="str">"secure"</span>: <span class="kw">false</span>
+  }
+}
+
+<span class="cmt">// angular.json → architect → serve → options</span>
+<span class="str">"proxyConfig"</span>: <span class="str">"proxy.conf.json"</span>
+
+<span class="cmt"># oppure avvia direttamente con:</span>
+ng serve --proxy-config proxy.conf.json</pre>
+  </div>
+</div>
+
+<!-- Serve da .NET produzione -->
+<div class="card">
+  <div class="card-header"><span class="card-title">7 — Servire Angular da .NET (Produzione)</span><span class="card-tag tag-service">deploy</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Build Angular</span>
+ng build --configuration production
+<span class="cmt"># Output in: dist/angular-ngxs-demo/</span>
+<span class="cmt"># Copiare il contenuto in: wwwroot/</span>
+
+<span class="cmt">// Program.cs — serve Angular + gestisce routing SPA</span>
+app.<span class="fn">UseDefaultFiles</span>();    <span class="cmt">// cerca index.html nella root</span>
+app.<span class="fn">UseStaticFiles</span>();    <span class="cmt">// serve file da wwwroot</span>
+app.<span class="fn">MapControllers</span>();
+app.<span class="fn">MapFallbackToFile</span>(<span class="str">"index.html"</span>);
+<span class="cmt">// Qualsiasi path non API (es. /products/5) → index.html → Angular gestisce il routing</span></pre>
+    <div class="info-box">
+      <div class="info-title">Ordine middleware importante</div>
+      <div class="rule-text">Le rotte API devono essere prima del <code>MapFallbackToFile</code>. Se invertito, ogni richiesta API restituisce index.html invece del JSON.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Checklist -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Checklist Finale</span><span class="card-tag tag-rule">check</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Cosa</th><th>Dove</th></tr>
+      <tr><td>✅ standalone: true in ogni componente</td><td>Decoratore @Component</td></tr>
+      <tr><td>✅ provideHttpClient() registrato</td><td>app.config.ts</td></tr>
+      <tr><td>✅ provideStore([...State]) registrato</td><td>app.config.ts</td></tr>
+      <tr><td>✅ zone.js importato (Angular 21+)</td><td>main.ts o angular.json polyfills</td></tr>
+      <tr><td>✅ CommonModule importato nei componenti che usano *ngFor/*ngIf</td><td>imports[] del @Component</td></tr>
+      <tr><td>✅ RouterModule importato nei componenti che usano routerLink</td><td>imports[] del @Component</td></tr>
+      <tr><td>✅ AsyncPipe importato se non uso CommonModule</td><td>imports[] del @Component</td></tr>
+      <tr><td>✅ MapFallbackToFile in Program.cs</td><td>Dopo MapControllers()</td></tr>
+    </table>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

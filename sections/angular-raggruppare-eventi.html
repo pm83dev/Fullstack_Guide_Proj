@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Angular — Raggruppare e Accoppiare Eventi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-purple">⚡</div>
+  <div>
+    <div class="section-title">Angular — Raggruppare e Accoppiare Eventi</div>
+    <div class="section-desc">Pattern pairEvents() con Map, accoppiamento START/STOP, calcolo durata, template con badge</div>
+  </div>
+</div>
+
+<!-- Concetto -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Concetto — Accoppiare START e STOP</span><span class="card-tag tag-pattern">pattern</span></div>
+  <div class="card-body">
+    <div class="info-box">
+      <div class="info-title">Problema</div>
+      <div class="rule-text">Gli eventi arrivano come array piatto. Ogni evento ha un <code>eventGroupId</code> che identifica la coppia START/STOP. L'obiettivo è trasformare l'array in coppie, calcolare la durata, e mostrare "In Corso" se lo STOP manca.</div>
+    </div>
+  </div>
+</div>
+
+<!-- pairEvents() -->
+<div class="card">
+  <div class="card-header"><span class="card-title">pairEvents() — Funzione di Raggruppamento con Map</span><span class="card-tag tag-service">typescript</span></div>
+  <div class="card-body">
+    <pre><span class="kw">private</span> <span class="fn">pairEvents</span>(events: <span class="cls">EventDataModel</span>[]): <span class="cls">EventPair</span>[] {
+  <span class="kw">const</span> pairs: <span class="cls">EventPair</span>[] = [];
+  <span class="kw">const</span> grouped = <span class="kw">new</span> <span class="cls">Map</span>&lt;<span class="typ">string</span>, <span class="cls">EventDataModel</span>[]&gt;();
+
+  <span class="cmt">// 1. Raggruppa per eventGroupId (fallback su eventId)</span>
+  events.<span class="fn">forEach</span>(event => {
+    <span class="kw">const</span> groupId = event.eventGroupId || event.eventId;
+    <span class="kw">if</span> (!grouped.<span class="fn">has</span>(groupId)) grouped.<span class="fn">set</span>(groupId, []);
+    grouped.<span class="fn">get</span>(groupId)!.<span class="fn">push</span>(event);
+  });
+
+  <span class="cmt">// 2. Per ogni gruppo cerca START e STOP</span>
+  grouped.<span class="fn">forEach</span>((groupEvents, groupId) => {
+    <span class="kw">const</span> startEvent = groupEvents.<span class="fn">find</span>(e =>
+      e.eventType?.<span class="fn">includes</span>(<span class="str">'START'</span>) || e.eventType?.<span class="fn">includes</span>(<span class="str">'AVVIAMENTO'</span>)
+    );
+    <span class="kw">const</span> stopEvent = groupEvents.<span class="fn">find</span>(e =>
+      e.eventType?.<span class="fn">includes</span>(<span class="str">'STOP'</span>) || e.eventType?.<span class="fn">includes</span>(<span class="str">'FINE'</span>)
+    );
+
+    <span class="cmt">// 3. Calcola durata se entrambi presenti</span>
+    <span class="kw">let</span> duration: <span class="typ">number</span> | <span class="typ">undefined</span>;
+    <span class="kw">let</span> durationFormatted: <span class="typ">string</span> | <span class="typ">undefined</span>;
+
+    <span class="kw">if</span> (startEvent?.eventDT && stopEvent?.eventDT) {
+      <span class="kw">const</span> start = <span class="kw">new</span> <span class="cls">Date</span>(startEvent.eventDT);
+      <span class="kw">const</span> stop  = <span class="kw">new</span> <span class="cls">Date</span>(stopEvent.eventDT);
+      duration = stop.<span class="fn">getTime</span>() - start.<span class="fn">getTime</span>();
+      durationFormatted = <span class="kw">this</span>.<span class="fn">formatDuration</span>(duration);
+    }
+
+    pairs.<span class="fn">push</span>({ groupId, startEvent, stopEvent, duration, durationFormatted });
+  });
+
+  <span class="kw">return</span> pairs;
+}</pre>
+  </div>
+</div>
+
+<!-- Interfacce -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Interfacce TypeScript</span><span class="card-tag tag-action">models</span></div>
+  <div class="card-body">
+    <pre><span class="kw">interface</span> <span class="cls">EventPair</span> {
+  groupId: <span class="typ">string</span>;
+  startEvent?: <span class="cls">EventDataModel</span>;
+  stopEvent?: <span class="cls">EventDataModel</span>;
+  duration?: <span class="typ">number</span>;         <span class="cmt">// millisecondi</span>
+  durationFormatted?: <span class="typ">string</span>; <span class="cmt">// es. "1h 23m 45s"</span>
+}
+
+<span class="kw">interface</span> <span class="cls">EventDataModel</span> {
+  eventId: <span class="typ">string</span>;
+  eventGroupId?: <span class="typ">string</span>;
+  eventType?: <span class="typ">string</span>;   <span class="cmt">// es. 'START_LAVORAZIONE', 'STOP_LAVORAZIONE'</span>
+  eventDT?: <span class="typ">string</span>;     <span class="cmt">// ISO date string</span>
+  articleRef?: <span class="typ">string</span>;
+  nrOrdine?: <span class="typ">string</span>;
+  pzStampati?: <span class="typ">number</span>;
+  pzTagliati?: <span class="typ">number</span>;
+}</pre>
+  </div>
+</div>
+
+<!-- Template -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Template HTML — Tabella con Badge "In Corso"</span><span class="card-tag tag-component">template</span></div>
+  <div class="card-body">
+    <pre>&lt;section&gt;
+  &lt;h4&gt;Eventi Accoppiati (Start/Stop)&lt;/h4&gt;
+  &lt;table class=<span class="str">"table table-striped"</span>&gt;
+    &lt;thead&gt;
+      &lt;tr&gt;
+        &lt;th&gt;Tipo Evento&lt;/th&gt;
+        &lt;th&gt;Inizio&lt;/th&gt;
+        &lt;th&gt;Fine&lt;/th&gt;
+        &lt;th&gt;Durata&lt;/th&gt;
+        &lt;th&gt;Articolo&lt;/th&gt;
+        &lt;th&gt;Ordine&lt;/th&gt;
+        &lt;th&gt;Pz Stampati&lt;/th&gt;
+        &lt;th&gt;Stato&lt;/th&gt;
+      &lt;/tr&gt;
+    &lt;/thead&gt;
+    &lt;tbody&gt;
+      &lt;tr *<span class="kw">ngFor</span>=<span class="str">"let pair of filteredPairs"</span>&gt;
+        &lt;td&gt;
+          {{ pair.startEvent?.eventType?.replace(<span class="str">'START_'</span>, <span class="str">''</span>) ||
+             pair.stopEvent?.eventType?.replace(<span class="str">'STOP_'</span>, <span class="str">''</span>) }}
+        &lt;/td&gt;
+        &lt;td&gt;{{ pair.startEvent?.eventDT | date:<span class="str">'dd/MM/yyyy HH:mm:ss'</span> }}&lt;/td&gt;
+        &lt;td&gt;{{ pair.stopEvent?.eventDT  | date:<span class="str">'dd/MM/yyyy HH:mm:ss'</span> }}&lt;/td&gt;
+        &lt;td&gt;
+          &lt;span *<span class="kw">ngIf</span>=<span class="str">"pair.durationFormatted; else noDuration"</span>&gt;
+            {{ pair.durationFormatted }}
+          &lt;/span&gt;
+          &lt;ng-template #noDuration&gt;
+            &lt;span class=<span class="str">"badge bg-primary"</span>&gt;In Corso&lt;/span&gt;
+          &lt;/ng-template&gt;
+        &lt;/td&gt;
+        &lt;td&gt;{{ pair.startEvent?.articleRef || pair.stopEvent?.articleRef }}&lt;/td&gt;
+        &lt;td&gt;{{ pair.startEvent?.nrOrdine  || pair.stopEvent?.nrOrdine }}&lt;/td&gt;
+        &lt;td&gt;{{ pair.stopEvent?.pzStampati || <span class="str">'-'</span> }}&lt;/td&gt;
+        &lt;td&gt;
+          &lt;span class=<span class="str">"badge"</span>
+                [ngClass]=<span class="str">"pair.stopEvent ? 'bg-success' : 'bg-warning'"</span>&gt;
+            {{ pair.stopEvent ? <span class="str">'Completato'</span> : <span class="str">'In Corso'</span> }}
+          &lt;/span&gt;
+        &lt;/td&gt;
+      &lt;/tr&gt;
+    &lt;/tbody&gt;
+  &lt;/table&gt;
+&lt;/section&gt;</pre>
+  </div>
+</div>
+
+<!-- Punti chiave -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Punti Chiave del Pattern</span><span class="card-tag tag-rule">best practice</span></div>
+  <div class="card-body">
+    <div class="rule-box">
+      <div class="rule-title">Map&lt;string, T[]&gt; per raggruppamento</div>
+      <div class="rule-text">Usa <code>new Map()</code> invece di un oggetto plain per raggruppare: <code>has()</code>, <code>get()</code>, <code>set()</code> sono type-safe e preservano l'ordine di inserimento.</div>
+    </div>
+    <div class="rule-box" style="margin-top:10px">
+      <div class="rule-title">Evento senza coppia = "In Corso"</div>
+      <div class="rule-text">Se <code>stopEvent</code> è <code>undefined</code>, la lavorazione è ancora in corso. Mostra il badge giallo invece della durata.</div>
+    </div>
+    <div class="rule-box" style="margin-top:10px">
+      <div class="rule-title">Fallback su eventId</div>
+      <div class="rule-text"><code>event.eventGroupId || event.eventId</code> — se l'evento non ha un groupId, si usa l'eventId stesso come chiave. In questo caso risulterà sempre una coppia con un solo evento.</div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

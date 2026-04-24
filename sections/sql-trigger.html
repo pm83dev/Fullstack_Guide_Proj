@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Server — Gestione Trigger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-red">⚡</div>
+  <div>
+    <div class="section-title">SQL Server — Gestione Trigger</div>
+    <div class="section-desc">Backup di trigger, disabilitazione, OBJECT_DEFINITION, REPLACE del nome</div>
+  </div>
+</div>
+
+<!-- Concetto -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Strategia — Backup prima di Modificare</span><span class="card-tag tag-pattern">workflow</span></div>
+  <div class="card-body">
+    <div class="info-box">
+      <div class="info-title">Procedura sicura</div>
+      <div class="rule-text">Prima di modificare un trigger in produzione: 1) crea una copia di backup rinominata <code>_OLD</code>, 2) disabilita il backup così non interferisce, 3) modifica il trigger originale. In caso di errore puoi abilitare la copia e confrontarla.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Script completo -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Script — Backup e Disabilitazione Trigger</span><span class="card-tag tag-action">sql</span></div>
+  <div class="card-body">
+    <pre>USE [PIM_Test];  <span class="cmt">-- sostituisci con il tuo DB</span>
+GO
+
+<span class="cmt">-- 1. Crea la copia di backup del trigger</span>
+<span class="kw">IF</span> OBJECT_ID(<span class="str">'dbo.CatalogBaseProduct_chktrg_OLD'</span>, <span class="str">'TR'</span>) <span class="kw">IS NOT NULL</span>
+<span class="kw">BEGIN</span>
+    PRINT <span class="str">'Trigger di backup già esistente.'</span>;
+<span class="kw">END</span>
+<span class="kw">ELSE</span>
+<span class="kw">BEGIN</span>
+    <span class="kw">DECLARE</span> @triggerDefinition <span class="cls">NVARCHAR</span>(<span class="cls">MAX</span>);
+
+    <span class="cmt">-- Recupera il testo del trigger originale</span>
+    <span class="kw">SELECT</span> @triggerDefinition = OBJECT_DEFINITION(
+        OBJECT_ID(<span class="str">'dbo.CatalogBaseProduct_chktrg'</span>)
+    );
+
+    <span class="cmt">-- Rinomina nel testo per creare il backup</span>
+    <span class="kw">SET</span> @triggerDefinition = <span class="cls">REPLACE</span>(
+        @triggerDefinition,
+        <span class="str">'CatalogBaseProduct_chktrg'</span>,
+        <span class="str">'CatalogBaseProduct_chktrg_OLD'</span>
+    );
+
+    <span class="cmt">-- Esegue il codice per creare il trigger di backup</span>
+    <span class="kw">EXEC</span>(@triggerDefinition);
+
+    PRINT <span class="str">'Trigger di backup creato: CatalogBaseProduct_chktrg_OLD'</span>;
+<span class="kw">END</span>
+GO
+
+<span class="cmt">-- 2. Disabilita la copia di backup</span>
+<span class="kw">IF</span> OBJECT_ID(<span class="str">'dbo.CatalogBaseProduct_chktrg_OLD'</span>, <span class="str">'TR'</span>) <span class="kw">IS NOT NULL</span>
+<span class="kw">BEGIN</span>
+    DISABLE TRIGGER dbo.CatalogBaseProduct_chktrg_OLD
+    ON dbo.CatalogBaseProduct;
+    PRINT <span class="str">'Trigger di backup disabilitato.'</span>;
+<span class="kw">END</span>
+GO
+
+<span class="cmt">-- 3. Il trigger originale resta attivo e pronto per modifiche</span>
+PRINT <span class="str">'Trigger originale pronto per modifiche: CatalogBaseProduct_chktrg'</span>;
+GO</pre>
+  </div>
+</div>
+
+<!-- Comandi utili -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Comandi Utili sui Trigger</span><span class="card-tag tag-rule">quick ref</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">-- Visualizza il testo di un trigger</span>
+<span class="kw">SELECT</span> OBJECT_DEFINITION(OBJECT_ID(<span class="str">'dbo.NomeTrigger'</span>));
+
+<span class="cmt">-- Lista tutti i trigger su una tabella</span>
+<span class="kw">SELECT</span> name, is_disabled, type_desc
+<span class="kw">FROM</span> sys.triggers
+<span class="kw">WHERE</span> parent_id = OBJECT_ID(<span class="str">'dbo.NomeTabella'</span>);
+
+<span class="cmt">-- Disabilita un trigger</span>
+DISABLE TRIGGER dbo.NomeTrigger ON dbo.NomeTabella;
+
+<span class="cmt">-- Abilita un trigger</span>
+ENABLE TRIGGER dbo.NomeTrigger ON dbo.NomeTabella;
+
+<span class="cmt">-- Elimina un trigger</span>
+DROP TRIGGER IF EXISTS dbo.NomeTrigger;
+
+<span class="cmt">-- Verifica se un trigger esiste</span>
+<span class="kw">IF</span> OBJECT_ID(<span class="str">'dbo.NomeTrigger'</span>, <span class="str">'TR'</span>) <span class="kw">IS NOT NULL</span>
+    PRINT <span class="str">'Trigger esiste'</span>;</pre>
+    <div class="rule-box">
+      <div class="rule-title">OBJECT_DEFINITION + EXEC — il trucco per clonare</div>
+      <div class="rule-text"><code>OBJECT_DEFINITION(OBJECT_ID(...))</code> restituisce il DDL completo del trigger come stringa. Con <code>REPLACE()</code> cambi il nome e con <code>EXEC()</code> esegui la stringa per creare il clone. Funziona anche per stored procedure e view.</div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

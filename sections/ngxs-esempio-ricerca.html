@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NGXS — Esempio Completo: Ricerca Utenti</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-blue">🔍</div>
+  <div>
+    <div class="section-title">Esempio Completo — Ricerca Utenti con NGXS + .NET</div>
+    <div class="section-desc">Flusso reale end-to-end: Component → Action → State → Service → Backend → UI</div>
+  </div>
+</div>
+
+<!-- Flusso -->
+<div class="flow">
+  <div class="flow-row"><span class="flow-node fn-red">Component</span><span class="flow-arrow">→</span><span class="flow-label">store.dispatch(new SearchUsers('Mario'))</span></div>
+  <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+  <div class="flow-row"><span class="flow-node fn-purple">State</span><span class="flow-arrow">→</span><span class="flow-label">loading=true, chiama userService.searchUsers('Mario')</span></div>
+  <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+  <div class="flow-row"><span class="flow-node fn-green">Service</span><span class="flow-arrow">→</span><span class="flow-label">GET /api/users?search=Mario → Observable&lt;User[]&gt;</span></div>
+  <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+  <div class="flow-row"><span class="flow-node fn-purple">State</span><span class="flow-arrow">→</span><span class="flow-label">dispatch SearchUsersSuccess(users) → patchState</span></div>
+  <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+  <div class="flow-row"><span class="flow-node fn-red">Template</span><span class="flow-arrow">→</span><span class="flow-label">async pipe aggiorna la lista automaticamente</span></div>
+</div>
+
+<!-- Model e Actions -->
+<div class="card">
+  <div class="card-header"><span class="card-title">1 — Model e Actions</span><span class="card-tag tag-action">action</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// user.model.ts</span>
+<span class="kw">export interface</span> <span class="cls">User</span> {
+  id: <span class="typ">string</span>;
+  name: <span class="typ">string</span>;
+  email: <span class="typ">string</span>;
+}
+
+<span class="kw">export interface</span> <span class="cls">UserStateModel</span> {
+  users: <span class="cls">User</span>[];
+  loading: <span class="typ">boolean</span>;
+  lastSearchTerm: <span class="typ">string | null</span>;
+  error: <span class="typ">string | null</span>;
+}
+
+<span class="cmt">// user.actions.ts</span>
+<span class="kw">export class</span> <span class="cls">SearchUsers</span> {
+  <span class="kw">static readonly</span> type = <span class="str">'[Users] Search'</span>;
+  <span class="fn">constructor</span>(<span class="kw">public</span> searchTerm: <span class="typ">string</span>) {}
+}
+
+<span class="kw">export class</span> <span class="cls">SearchUsersSuccess</span> {
+  <span class="kw">static readonly</span> type = <span class="str">'[Users] Search Success'</span>;
+  <span class="fn">constructor</span>(<span class="kw">public</span> users: <span class="cls">User</span>[], <span class="kw">public</span> searchTerm: <span class="typ">string</span>) {}
+}
+
+<span class="kw">export class</span> <span class="cls">SearchUsersFailure</span> {
+  <span class="kw">static readonly</span> type = <span class="str">'[Users] Search Failure'</span>;
+  <span class="fn">constructor</span>(<span class="kw">public</span> error: <span class="typ">string</span>, <span class="kw">public</span> searchTerm: <span class="typ">string</span>) {}
+}</pre>
+  </div>
+</div>
+
+<!-- Service -->
+<div class="card">
+  <div class="card-header"><span class="card-title">2 — Service HTTP</span><span class="card-tag tag-service">service</span></div>
+  <div class="card-body">
+    <pre><span class="dec">@Injectable</span>({ providedIn: <span class="str">'root'</span> })
+<span class="kw">export class</span> <span class="cls">UserService</span> {
+  <span class="kw">private</span> apiUrl = <span class="str">'https://localhost:5001/api/users'</span>;
+
+  <span class="fn">constructor</span>(<span class="kw">private</span> http: <span class="cls">HttpClient</span>) {}
+
+  <span class="fn">searchUsers</span>(term: <span class="typ">string</span>): <span class="cls">Observable</span>&lt;<span class="cls">User</span>[]&gt; {
+    <span class="cmt">// GET /api/users?search=term</span>
+    <span class="kw">return</span> this.http.<span class="fn">get</span>&lt;<span class="cls">User</span>[]&gt;(<span class="str">`${this.apiUrl}?search=${term}`</span>);
+  }
+}</pre>
+  </div>
+</div>
+
+<!-- State -->
+<div class="card">
+  <div class="card-header"><span class="card-title">3 — State completo</span><span class="card-tag tag-state">state</span></div>
+  <div class="card-body">
+    <pre><span class="dec">@State</span>&lt;<span class="cls">UserStateModel</span>&gt;({
+  name: <span class="str">'users'</span>,
+  defaults: { users: [], loading: <span class="kw">false</span>, lastSearchTerm: <span class="kw">null</span>, error: <span class="kw">null</span> }
+})
+<span class="dec">@Injectable</span>()
+<span class="kw">export class</span> <span class="cls">UserState</span> {
+
+  <span class="fn">constructor</span>(<span class="kw">private</span> userService: <span class="cls">UserService</span>) {}
+
+  <span class="dec">@Selector</span>() <span class="kw">static</span> <span class="fn">getUsers</span>(s: <span class="cls">UserStateModel</span>) { <span class="kw">return</span> s.users; }
+  <span class="dec">@Selector</span>() <span class="kw">static</span> <span class="fn">isLoading</span>(s: <span class="cls">UserStateModel</span>) { <span class="kw">return</span> s.loading; }
+  <span class="dec">@Selector</span>() <span class="kw">static</span> <span class="fn">getLastSearchTerm</span>(s: <span class="cls">UserStateModel</span>) { <span class="kw">return</span> s.lastSearchTerm; }
+  <span class="dec">@Selector</span>() <span class="kw">static</span> <span class="fn">getError</span>(s: <span class="cls">UserStateModel</span>) { <span class="kw">return</span> s.error; }
+
+  <span class="dec">@Action</span>(<span class="cls">SearchUsers</span>)
+  <span class="fn">searchUsers</span>(ctx: <span class="cls">StateContext</span>&lt;<span class="cls">UserStateModel</span>&gt;, action: <span class="cls">SearchUsers</span>) {
+    <span class="kw">const</span> term = action.searchTerm;
+    ctx.<span class="fn">patchState</span>({ loading: <span class="kw">true</span>, error: <span class="kw">null</span>, lastSearchTerm: term });
+
+    <span class="kw">return</span> this.userService.<span class="fn">searchUsers</span>(term).pipe(
+      <span class="fn">tap</span>((users: <span class="cls">User</span>[]) => {
+        ctx.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">SearchUsersSuccess</span>(users, term));
+      }),
+      <span class="fn">catchError</span>(err => {
+        <span class="kw">return</span> <span class="fn">of</span>(ctx.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">SearchUsersFailure</span>(err.message, term)));
+      })
+    );
+  }
+
+  <span class="dec">@Action</span>(<span class="cls">SearchUsersSuccess</span>)
+  <span class="fn">searchSuccess</span>(ctx: <span class="cls">StateContext</span>&lt;<span class="cls">UserStateModel</span>&gt;, action: <span class="cls">SearchUsersSuccess</span>) {
+    ctx.<span class="fn">patchState</span>({ users: action.users, loading: <span class="kw">false</span>, error: <span class="kw">null</span> });
+  }
+
+  <span class="dec">@Action</span>(<span class="cls">SearchUsersFailure</span>)
+  <span class="fn">searchFailure</span>(ctx: <span class="cls">StateContext</span>&lt;<span class="cls">UserStateModel</span>&gt;, action: <span class="cls">SearchUsersFailure</span>) {
+    ctx.<span class="fn">patchState</span>({ users: [], loading: <span class="kw">false</span>, error: action.error });
+  }
+}</pre>
+  </div>
+</div>
+
+<!-- Component + Template -->
+<div class="card">
+  <div class="card-header"><span class="card-title">4 — Component e Template</span><span class="card-tag tag-component">component</span></div>
+  <div class="card-body">
+    <pre><span class="dec">@Component</span>({
+  selector: <span class="str">'app-user-search'</span>,
+  template: <span class="str">`
+    &lt;input #searchInput
+           (keyup.enter)="onSearch(searchInput.value)"
+           placeholder="Cerca per nome o email" /&gt;
+    &lt;button (click)="onSearch(searchInput.value)"&gt;Cerca&lt;/button&gt;
+
+    &lt;div *ngIf="loading$ | async"&gt;⏳ Caricamento...&lt;/div&gt;
+
+    &lt;div *ngIf="error$ | async as error" style="color:red"&gt;
+      ❌ Errore: {{ error }}
+    &lt;/div&gt;
+
+    &lt;ul *ngIf="(users$ | async) as users"&gt;
+      &lt;li *ngFor="let user of users"&gt;
+        &lt;strong&gt;{{ user.name }}&lt;/strong&gt; ({{ user.email }})
+      &lt;/li&gt;
+    &lt;/ul&gt;
+
+    &lt;div *ngIf="(users$ | async)?.length === 0
+                && !(loading$ | async)
+                && (lastSearchTerm$ | async)"&gt;
+      😕 Nessun utente trovato per "{{ lastSearchTerm$ | async }}"
+    &lt;/div&gt;
+  `</span>
+})
+<span class="kw">export class</span> <span class="cls">UserSearchComponent</span> {
+  users$          = this.store.<span class="fn">select</span>(<span class="cls">UserState</span>.getUsers);
+  loading$        = this.store.<span class="fn">select</span>(<span class="cls">UserState</span>.isLoading);
+  error$          = this.store.<span class="fn">select</span>(<span class="cls">UserState</span>.getError);
+  lastSearchTerm$ = this.store.<span class="fn">select</span>(<span class="cls">UserState</span>.getLastSearchTerm);
+
+  <span class="fn">constructor</span>(<span class="kw">private</span> store: <span class="cls">Store</span>) {}
+
+  <span class="fn">onSearch</span>(term: <span class="typ">string</span>) {
+    <span class="kw">if</span> (term.trim()) {
+      this.store.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">SearchUsers</span>(term));
+    }
+  }
+}</pre>
+  </div>
+</div>
+
+<!-- Flusso spiegato passo passo -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Flusso passo per passo</span><span class="card-tag tag-pattern">walkthrough</span></div>
+  <div class="card-body">
+    <pre><span class="acc">1.</span> Utente digita "Mario" e preme Invio → <span class="fn">onSearch</span>(<span class="str">'Mario'</span>)
+<span class="acc">2.</span> Component dispatcha → <span class="kw">new</span> <span class="cls">SearchUsers</span>(<span class="str">'Mario'</span>)
+<span class="acc">3.</span> State riceve SearchUsers:
+   - patchState loading=true, lastSearchTerm='Mario'
+   - UI mostra spinner, ricorda il termine
+   - Chiama userService.searchUsers('Mario') → HTTP GET
+
+<span class="acc">4.</span> Backend .NET risponde:
+   [{ id:'1', name:'Mario Rossi', email:'mario@example.com' }]
+
+<span class="acc">5.</span> State: tap dispatcha SearchUsersSuccess(users, 'Mario')
+<span class="acc">6.</span> SearchUsersSuccess: patchState users=[...], loading=false
+<span class="acc">7.</span> Template:
+   - loading$ → false → spinner scompare
+   - users$ emette il nuovo array → *ngFor aggiorna la lista
+
+<span class="acc">8.</span> Se errore (500 backend):
+   - SearchUsersFailure aggiorna error
+   - UI mostra messaggio rosso</pre>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

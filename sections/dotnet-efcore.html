@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dotnet-efcore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+  <div class="section-icon icon-purple">🗄️</div>
+  <div>
+    <div class="section-title">Entity Framework Core</div>
+    <div class="section-desc">DbContext, entità, migrations, Repository pattern, query LINQ comuni</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Entità + DbContext</span><span class="card-tag tag-pattern">C#</span></div>
+  <pre><span class="cmt">// Core/Entities/Product.cs</span>
+<span class="kw">public class</span> <span class="cls">Product</span> {
+    <span class="kw">public int</span> Id { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public string</span> Name { <span class="kw">get</span>; <span class="kw">set</span>; } = string.Empty;
+    <span class="kw">public decimal</span> Price { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> DateTime CreatedAt { <span class="kw">get</span>; <span class="kw">set</span>; } = DateTime.UtcNow;
+}
+
+<span class="cmt">// Infrastructure/AppDbContext.cs</span>
+<span class="kw">public class</span> <span class="cls">AppDbContext</span> : <span class="cls">DbContext</span> {
+    <span class="kw">public</span> <span class="cls">AppDbContext</span>(<span class="cls">DbContextOptions</span>&lt;<span class="cls">AppDbContext</span>&gt; opt) : <span class="kw">base</span>(opt) {}
+    <span class="kw">public</span> DbSet&lt;<span class="cls">Product</span>&gt; Products =&gt; Set&lt;<span class="cls">Product</span>&gt;();
+
+    <span class="kw">protected override void</span> <span class="fn">OnModelCreating</span>(<span class="cls">ModelBuilder</span> mb) {
+        mb.<span class="fn">Entity</span>&lt;<span class="cls">Product</span>&gt;(e =&gt; {
+            e.<span class="fn">Property</span>(p =&gt; p.Name).<span class="fn">HasMaxLength</span>(<span class="acc">200</span>).<span class="fn">IsRequired</span>();
+            e.<span class="fn">Property</span>(p =&gt; p.Price).<span class="fn">HasColumnType</span>(<span class="str">"decimal(18,2)"</span>);
+        });
+    }
+}</pre>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Migrations — comandi CLI</span><span class="card-tag tag-action">CLI</span></div>
+  <pre><span class="cmt"># Crea migration (da root solution)</span>
+dotnet ef migrations add InitialCreate \
+  --project MyProject.Infrastructure \
+  --startup-project MyProject.Api
+
+<span class="cmt"># Applica al DB</span>
+dotnet ef database update \
+  --project MyProject.Infrastructure \
+  --startup-project MyProject.Api
+
+<span class="cmt"># Rollback a migration precedente</span>
+dotnet ef database update NomeMigrazionePrecedente
+
+<span class="cmt"># Rimuove ultima migration (non ancora applicata)</span>
+dotnet ef migrations remove \
+  --project MyProject.Infrastructure \
+  --startup-project MyProject.Api</pre>
+  <div class="card-body">
+    <p>⚠️ Non modificare mai manualmente i file di migration generati. Se si sbaglia, creare una migration correttiva. Committare sempre i file di migration nel repo: sono la storia dello schema del DB.</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Repository pattern (interfaccia + implementazione)</span></div>
+  <pre><span class="cmt">// Core/Interfaces/IProductRepository.cs</span>
+<span class="kw">public interface</span> <span class="cls">IProductRepository</span> {
+    Task&lt;IEnumerable&lt;<span class="cls">Product</span>&gt;&gt; <span class="fn">GetAllAsync</span>();
+    Task&lt;<span class="cls">Product</span>?&gt; <span class="fn">GetByIdAsync</span>(<span class="kw">int</span> id);
+    Task&lt;<span class="cls">Product</span>&gt; <span class="fn">CreateAsync</span>(<span class="cls">Product</span> entity);
+    Task&lt;<span class="kw">bool</span>&gt; <span class="fn">UpdateAsync</span>(<span class="cls">Product</span> entity);
+    Task&lt;<span class="kw">bool</span>&gt; <span class="fn">DeleteAsync</span>(<span class="kw">int</span> id);
+}
+
+<span class="cmt">// Infrastructure/Repositories/ProductRepository.cs</span>
+<span class="kw">public class</span> <span class="cls">ProductRepository</span> : <span class="cls">IProductRepository</span> {
+    <span class="kw">private readonly</span> <span class="cls">AppDbContext</span> _db;
+    <span class="kw">public</span> <span class="cls">ProductRepository</span>(<span class="cls">AppDbContext</span> db) =&gt; _db = db;
+
+    <span class="kw">public async</span> Task&lt;IEnumerable&lt;<span class="cls">Product</span>&gt;&gt; <span class="fn">GetAllAsync</span>()
+        =&gt; <span class="kw">await</span> _db.Products.<span class="fn">AsNoTracking</span>().<span class="fn">ToListAsync</span>();
+
+    <span class="kw">public async</span> Task&lt;<span class="cls">Product</span>?&gt; <span class="fn">GetByIdAsync</span>(<span class="kw">int</span> id)
+        =&gt; <span class="kw">await</span> _db.Products.<span class="fn">FindAsync</span>(id);
+
+    <span class="kw">public async</span> Task&lt;<span class="cls">Product</span>&gt; <span class="fn">CreateAsync</span>(<span class="cls">Product</span> entity) {
+        _db.Products.<span class="fn">Add</span>(entity);
+        <span class="kw">await</span> _db.<span class="fn">SaveChangesAsync</span>();
+        <span class="kw">return</span> entity;
+    }
+
+    <span class="kw">public async</span> Task&lt;<span class="kw">bool</span>&gt; <span class="fn">UpdateAsync</span>(<span class="cls">Product</span> entity) {
+        _db.Products.<span class="fn">Update</span>(entity);
+        <span class="kw">return await</span> _db.<span class="fn">SaveChangesAsync</span>() &gt; <span class="acc">0</span>;
+    }
+
+    <span class="kw">public async</span> Task&lt;<span class="kw">bool</span>&gt; <span class="fn">DeleteAsync</span>(<span class="kw">int</span> id) {
+        <span class="kw">var</span> e = <span class="kw">await</span> _db.Products.<span class="fn">FindAsync</span>(id);
+        <span class="kw">if</span> (e <span class="kw">is null</span>) <span class="kw">return false</span>;
+        _db.Products.<span class="fn">Remove</span>(e);
+        <span class="kw">return await</span> _db.<span class="fn">SaveChangesAsync</span>() &gt; <span class="acc">0</span>;
+    }
+}</pre>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Query LINQ comuni</span></div>
+  <pre><span class="cmt">// Filtra + ordina + pagina</span>
+<span class="kw">var</span> items = <span class="kw">await</span> _db.Products
+    .<span class="fn">Where</span>(p =&gt; p.Price &gt; <span class="acc">10</span> &amp;&amp; p.Name.<span class="fn">Contains</span>(<span class="str">"ABC"</span>))
+    .<span class="fn">OrderBy</span>(p =&gt; p.Name)
+    .<span class="fn">Skip</span>((page - <span class="acc">1</span>) * size)
+    .<span class="fn">Take</span>(size)
+    .<span class="fn">AsNoTracking</span>()
+    .<span class="fn">ToListAsync</span>();
+
+<span class="cmt">// Include (JOIN con navigazione)</span>
+<span class="kw">var</span> orders = <span class="kw">await</span> _db.Orders
+    .<span class="fn">Include</span>(o =&gt; o.Customer)
+    .<span class="fn">Include</span>(o =&gt; o.Lines).<span class="fn">ThenInclude</span>(l =&gt; l.Product)
+    .<span class="fn">ToListAsync</span>();
+
+<span class="cmt">// Proiezione su DTO (evita overfetching)</span>
+<span class="kw">var</span> dtos = <span class="kw">await</span> _db.Products
+    .<span class="fn">Select</span>(p =&gt; <span class="kw">new</span> <span class="cls">ProductDto</span> { Id = p.Id, Name = p.Name })
+    .<span class="fn">ToListAsync</span>();
+
+<span class="cmt">// SQL grezzo (quando LINQ non basta)</span>
+<span class="kw">var</span> result = <span class="kw">await</span> _db.Products
+    .<span class="fn">FromSqlRaw</span>(<span class="str">"SELECT * FROM Products WHERE Price > {0}"</span>, <span class="acc">100</span>)
+    .<span class="fn">ToListAsync</span>();</pre>
+  <div class="card-body">
+    <p>⚠️ Usare sempre <code>AsNoTracking()</code> nelle query di sola lettura (GET): disabilita il change tracking e migliora sensibilmente le performance.</p>
+  </div>
+</div>
+</div>
+</body>
+</html>

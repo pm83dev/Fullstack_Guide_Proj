@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rxjs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-blue">🌊</div>
+        <div>
+          <div class="section-title">Observable / RxJS</div>
+          <div class="section-desc">I concetti minimi da tenere in testa per non perdersi</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Glossario rapido</span></div>
+        <table>
+          <tr><th>Concetto</th><th>Spiegazione</th></tr>
+          <tr><td>Observable</td><td>Risultato che arriverà dopo (flusso asincrono)</td></tr>
+          <tr><td>subscribe()</td><td>Cosa fare quando il risultato arriva</td></tr>
+          <tr><td>tap()</td><td>Effetto collaterale senza modificare il valore (es: patchState)</td></tr>
+          <tr><td>catchError()</td><td>Gestione errori nel pipe</td></tr>
+          <tr><td>throwError()</td><td>Ripropaga l'errore dopo catchError</td></tr>
+          <tr><td>pipe()</td><td>Catena di operatori sull'Observable</td></tr>
+          <tr><td>async pipe</td><td>Gestisce subscribe/unsubscribe automaticamente nel template</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Pattern con subscribe nel component</span></div>
+        <pre>
+<span class="kw">this</span>.<span class="prop">store</span>.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">InsertOrderAction</span>(payload))
+  .<span class="fn">subscribe</span>({
+    <span class="fn">next</span>: () => {
+      <span class="cmt">// successo: svuota carrello, apri modale</span>
+      <span class="kw">this</span>.<span class="fn">clearCart</span>();
+      <span class="kw">this</span>.<span class="prop">showSuccessModal</span> = <span class="kw">true</span>;
+    },
+    <span class="fn">error</span>: (err) => {
+      <span class="cmt">// errore: mostra messaggio</span>
+      <span class="kw">this</span>.<span class="prop">errorMessage</span> = <span class="str">'Errore nell\'ordine'</span>;
+    },
+  });</pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Versione da ricordare</span></div>
+        <div class="card-body">
+          <p><span class="badge">Observable</span> = risultato che arriverà dopo</p>
+          <p><span class="badge">subscribe()</span> = cosa fare quando arriva</p>
+          <p><span class="badge">orderService.insertOrder()</span> = chiamata HTTP</p>
+          <p><span class="badge">store.dispatch()</span> = esecuzione dell'action NGXS</p>
+          <p><span class="badge">state</span> = fa la logica dati</p>
+          <p><span class="badge">component</span> = reagisce con la UI</p>
+        </div>
+      </div>
+</div>
+</body>
+</html>

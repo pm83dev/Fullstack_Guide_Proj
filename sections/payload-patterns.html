@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payload — Pattern Avanzati</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-orange">📦</div>
+  <div>
+    <div class="section-title">action.payload — Pattern Avanzati</div>
+    <div class="section-desc">Payload tipizzati, namespace, validazione, trasformazione, dispatch condizionale</div>
+  </div>
+</div>
+
+<!-- Namespace pattern -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Namespace per Organizzare le Actions</span><span class="card-tag tag-action">pattern</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// user.actions.ts — pattern namespace</span>
+<span class="kw">export namespace</span> <span class="cls">UserActions</span> {
+
+  <span class="kw">export interface</span> <span class="cls">LoadUsersPayload</span> {
+    page: <span class="typ">number</span>;
+    pageSize: <span class="typ">number</span>;
+    filters?: {
+      name?: <span class="typ">string</span>;
+      isActive?: <span class="typ">boolean</span>;
+    };
+  }
+
+  <span class="kw">export class</span> <span class="cls">LoadUsers</span> {
+    <span class="kw">static readonly</span> type = <span class="str">'[User List] Load Users'</span>;
+    <span class="fn">constructor</span>(<span class="kw">public</span> payload: <span class="cls">LoadUsersPayload</span>) {}
+  }
+
+  <span class="kw">export class</span> <span class="cls">CreateUser</span> {
+    <span class="kw">static readonly</span> type = <span class="str">'[User Form] Create User'</span>;
+    <span class="fn">constructor</span>(<span class="kw">public</span> payload: <span class="cls">CreateUserDto</span>) {}
+  }
+
+  <span class="kw">export class</span> <span class="cls">UpdateUser</span> {
+    <span class="kw">static readonly</span> type = <span class="str">'[User Form] Update User'</span>;
+    <span class="fn">constructor</span>(<span class="kw">public</span> id: <span class="typ">string</span>, <span class="kw">public</span> payload: <span class="cls">UpdateUserDto</span>) {}
+  }
+
+  <span class="kw">export class</span> <span class="cls">LoadUsersFailure</span> {
+    <span class="kw">static readonly</span> type = <span class="str">'[User API] Load Users Failure'</span>;
+    <span class="fn">constructor</span>(<span class="kw">public</span> payload: { error: <span class="typ">any</span>; statusCode: <span class="typ">number</span> }) {}
+  }
+}
+
+<span class="cmt">// Uso nel componente</span>
+this.store.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">UserActions</span>.<span class="cls">LoadUsers</span>({
+  page: <span class="acc">1</span>, pageSize: <span class="acc">10</span>, filters: { isActive: <span class="kw">true</span> }
+}));</pre>
+  </div>
+</div>
+
+<!-- Dispatch condizionale -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Dispatch Condizionale e Multiplo</span><span class="card-tag tag-component">component</span></div>
+  <div class="card-body">
+    <pre><span class="kw">async</span> <span class="fn">saveUser</span>(userData: <span class="typ">any</span>) {
+  <span class="cmt">// Dispatch condizionale: create o update</span>
+  <span class="kw">if</span> (userData.id) {
+    <span class="kw">await</span> this.store.<span class="fn">dispatch</span>(
+      <span class="kw">new</span> <span class="cls">UserActions</span>.<span class="cls">UpdateUser</span>(userData.id, {
+        name: userData.name, email: userData.email
+      })
+    ).toPromise();
+  } <span class="kw">else</span> {
+    <span class="kw">await</span> this.store.<span class="fn">dispatch</span>(
+      <span class="kw">new</span> <span class="cls">UserActions</span>.<span class="cls">CreateUser</span>({
+        name: userData.name, email: userData.email, password: userData.password
+      })
+    ).toPromise();
+  }
+
+  <span class="cmt">// Dispatch multiplo in un colpo solo</span>
+  this.store.<span class="fn">dispatch</span>([
+    <span class="kw">new</span> <span class="cls">UserActions</span>.<span class="cls">LoadUsers</span>({ page: <span class="acc">1</span>, pageSize: <span class="acc">10</span> }),
+    <span class="kw">new</span> <span class="cls">NotificationActions</span>.<span class="cls">ShowSuccess</span>(<span class="str">'Salvato!'</span>)
+  ]);
+}</pre>
+  </div>
+</div>
+
+<!-- Validazione payload nello State -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Validazione del Payload nello State</span><span class="card-tag tag-state">state</span></div>
+  <div class="card-body">
+    <pre><span class="dec">@Action</span>(<span class="cls">UserActions</span>.<span class="cls">CreateUser</span>)
+<span class="fn">createUser</span>(ctx: <span class="cls">StateContext</span>&lt;<span class="cls">UserStateModel</span>&gt;, action: <span class="cls">UserActions</span>.<span class="cls">CreateUser</span>) {
+  <span class="kw">const</span> { name, email, password } = action.payload;
+
+  <span class="cmt">// Validazione prima di procedere</span>
+  <span class="kw">if</span> (!name?.trim()) {
+    <span class="kw">return</span> ctx.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">UserActions</span>.<span class="cls">CreateUserFailure</span>({
+      error: <span class="str">'Name is required'</span>, field: <span class="str">'name'</span>
+    }));
+  }
+  <span class="kw">if</span> (!<span class="fn">isValidEmail</span>(email)) {
+    <span class="kw">return</span> ctx.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">UserActions</span>.<span class="cls">CreateUserFailure</span>({
+      error: <span class="str">'Invalid email'</span>, field: <span class="str">'email'</span>
+    }));
+  }
+
+  ctx.<span class="fn">patchState</span>({ loading: <span class="kw">true</span> });
+  <span class="kw">return</span> this.userService.<span class="fn">createUser</span>(action.payload).pipe(
+    <span class="fn">tap</span>(user => ctx.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">UserActions</span>.<span class="cls">CreateUserSuccess</span>(user))),
+    <span class="fn">catchError</span>(err => <span class="fn">of</span>(ctx.<span class="fn">dispatch</span>(
+      <span class="kw">new</span> <span class="cls">UserActions</span>.<span class="cls">CreateUserFailure</span>({ error: err.message, statusCode: err.status })
+    )))
+  );
+}</pre>
+  </div>
+</div>
+
+<!-- Destrutturazione e accesso payload multiplo -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Destrutturazione — Payload con Più Campi</span><span class="card-tag tag-state">state</span></div>
+  <div class="card-body">
+    <pre><span class="dec">@Action</span>(<span class="cls">UserActions</span>.<span class="cls">LoadUsers</span>)
+<span class="fn">loadUsers</span>(ctx: <span class="cls">StateContext</span>&lt;<span class="cls">UserStateModel</span>&gt;, action: <span class="cls">UserActions</span>.<span class="cls">LoadUsers</span>) {
+  <span class="cmt">// Destrutturazione per accesso pulito</span>
+  <span class="kw">const</span> { page, pageSize, filters } = action.payload;
+
+  ctx.<span class="fn">patchState</span>({ loading: <span class="kw">true</span>, error: <span class="kw">null</span> });
+
+  <span class="kw">return</span> this.userService.<span class="fn">getUsers</span>(page, pageSize, filters).pipe(
+    <span class="fn">tap</span>(result => {
+      ctx.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">UserActions</span>.<span class="cls">LoadUsersSuccess</span>(result.items));
+    }),
+    <span class="fn">catchError</span>(error => <span class="fn">of</span>(
+      ctx.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">UserActions</span>.<span class="cls">LoadUsersFailure</span>({
+        error: error.message, statusCode: error.status
+      }))
+    ))
+  );
+}
+
+<span class="cmt">// Payload doppio: id + dati separati</span>
+<span class="dec">@Action</span>(<span class="cls">UserActions</span>.<span class="cls">UpdateUser</span>)
+<span class="fn">updateUser</span>(ctx: <span class="cls">StateContext</span>&lt;<span class="cls">UserStateModel</span>&gt;, action: <span class="cls">UserActions</span>.<span class="cls">UpdateUser</span>) {
+  <span class="kw">const</span> userId    = action.id;       <span class="cmt">// string</span>
+  <span class="kw">const</span> updateData = action.payload; <span class="cmt">// UpdateUserDto</span>
+
+  <span class="kw">return</span> this.userService.<span class="fn">updateUser</span>(userId, updateData).pipe(
+    <span class="fn">tap</span>(updatedUser => {
+      <span class="kw">const</span> state = ctx.<span class="fn">getState</span>();
+      ctx.<span class="fn">patchState</span>({
+        users: state.users.<span class="fn">map</span>(u => u.id === updatedUser.id ? updatedUser : u),
+        loading: <span class="kw">false</span>
+      });
+    })
+  );
+}</pre>
+  </div>
+</div>
+
+<!-- Spread operator nel Service -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Spread Operator — Aggiungere Campi al Payload nel Service</span><span class="card-tag tag-service">service</span></div>
+  <div class="card-body">
+    <p>Pattern tipico: il component passa un filtro, il service aggiunge un campo preso dallo store (es. <code>AnaCod</code> dall'utente autenticato).</p>
+    <pre><span class="fn">getDocuments</span>(payload?: <span class="cls">Params</span>): <span class="cls">Observable</span>&lt;<span class="cls">IDocumentModel</span>&gt; {
+  <span class="kw">const</span> user = this.store.<span class="fn">selectSnapshot</span>(<span class="cls">AccountState</span>.user);
+  <span class="kw">const</span> tmpAnaCod = user?.id ?? <span class="acc">0</span>;
+  <span class="kw">const</span> url = <span class="str">`${environment.API_URL}/Documenti/getAllDocs`</span>;
+
+  <span class="cmt">// Spread: copia il payload + aggiunge AnaCod</span>
+  <span class="kw">const</span> params = { ...payload, AnaCod: tmpAnaCod };
+  <span class="cmt">// { OrdNum: 7 } + { AnaCod: 93 } → { OrdNum: 7, AnaCod: 93 }</span>
+
+  <span class="kw">return</span> this.http.<span class="fn">get</span>&lt;<span class="cls">IDocumentModel</span>&gt;(url, { params });
+  <span class="cmt">// Angular genera: ?OrdNum=7&AnaCod=93  ✓</span>
+}</pre>
+    <div class="rule-box">
+      <div class="rule-title">⚠ Errore comune — wrapping doppio</div>
+      <div class="rule-text">
+        <strong>SBAGLIATO:</strong> <code>getDocuments({ payload })</code> → il service riceve <code>{ payload: {...} }</code><br>
+        <strong>CORRETTO:</strong> <code>getDocuments(action.payload)</code> → il service riceve <code>{ OrdNum: 7 }</code>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabella riepilogo -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Riepilogo — Tutti i Pattern Payload</span><span class="card-tag tag-rule">quick ref</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Pattern</th><th>Quando usarlo</th><th>Sintassi</th></tr>
+      <tr><td>Payload singolo</td><td>Operazioni semplici create/delete</td><td><code>constructor(public payload: Dto) {}</code></td></tr>
+      <tr><td>Payload doppio</td><td>Update con id separato</td><td><code>constructor(public id: string, public payload: Dto) {}</code></td></tr>
+      <tr><td>Namespace</td><td>Molte actions dello stesso dominio</td><td><code>export namespace UserActions { export class... }</code></td></tr>
+      <tr><td>Dispatch multiplo</td><td>Aggiornare più state in un colpo</td><td><code>store.dispatch([action1, action2])</code></td></tr>
+      <tr><td>Dispatch condizionale</td><td>Create vs Update</td><td><code>if (id) dispatch(Update) else dispatch(Create)</code></td></tr>
+      <tr><td>Spread nel Service</td><td>Aggiungere campo da store al payload</td><td><code>{ ...payload, AnaCod: user.id }</code></td></tr>
+      <tr><td>Validazione nello State</td><td>Dati critici che arrivano dal form</td><td><code>if (!name) return ctx.dispatch(Failure)</code></td></tr>
+    </table>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

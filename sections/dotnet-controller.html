@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dotnet-controller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+  <div class="section-icon icon-green">🎮</div>
+  <div>
+    <div class="section-title">Controller &amp; CRUD</div>
+    <div class="section-desc">ApiController, routing, parametri request, risposte HTTP standardizzate, JWT protect</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Controller base con CRUD completo</span><span class="card-tag tag-pattern">C#</span></div>
+  <pre><span class="dec">[ApiController]</span>
+<span class="dec">[Route(<span class="str">"api/[controller]"</span>)]</span>
+<span class="kw">public class</span> <span class="cls">ProductsController</span> : <span class="cls">ControllerBase</span>
+{
+    <span class="kw">private readonly</span> <span class="cls">IProductRepository</span> _repo;
+    <span class="kw">public</span> <span class="cls">ProductsController</span>(<span class="cls">IProductRepository</span> repo) =&gt; _repo = repo;
+
+    <span class="cmt">// GET api/products</span>
+    <span class="dec">[HttpGet]</span>
+    <span class="kw">public async</span> Task&lt;<span class="cls">IActionResult</span>&gt; <span class="fn">GetAll</span>()
+        =&gt; <span class="fn">Ok</span>(<span class="kw">await</span> _repo.<span class="fn">GetAllAsync</span>());
+
+    <span class="cmt">// GET api/products/5</span>
+    <span class="dec">[HttpGet(<span class="str">"{id:int}"</span>)]</span>
+    <span class="kw">public async</span> Task&lt;<span class="cls">IActionResult</span>&gt; <span class="fn">GetById</span>(<span class="kw">int</span> id) {
+        <span class="kw">var</span> item = <span class="kw">await</span> _repo.<span class="fn">GetByIdAsync</span>(id);
+        <span class="kw">return</span> item <span class="kw">is null</span> ? <span class="fn">NotFound</span>() : <span class="fn">Ok</span>(item);
+    }
+
+    <span class="cmt">// POST api/products</span>
+    <span class="dec">[HttpPost]</span>
+    <span class="kw">public async</span> Task&lt;<span class="cls">IActionResult</span>&gt; <span class="fn">Create</span>(<span class="dec">[FromBody]</span> <span class="cls">ProductDto</span> dto) {
+        <span class="kw">var</span> created = <span class="kw">await</span> _repo.<span class="fn">CreateAsync</span>(dto);
+        <span class="kw">return</span> <span class="fn">CreatedAtAction</span>(<span class="kw">nameof</span>(GetById), <span class="kw">new</span> { id = created.Id }, created);
+    }
+
+    <span class="cmt">// PUT api/products/5</span>
+    <span class="dec">[HttpPut(<span class="str">"{id:int}"</span>)]</span>
+    <span class="kw">public async</span> Task&lt;<span class="cls">IActionResult</span>&gt; <span class="fn">Update</span>(<span class="kw">int</span> id, <span class="dec">[FromBody]</span> <span class="cls">ProductDto</span> dto) {
+        <span class="kw">if</span> (!<span class="kw">await</span> _repo.<span class="fn">UpdateAsync</span>(id, dto)) <span class="kw">return</span> <span class="fn">NotFound</span>();
+        <span class="kw">return</span> <span class="fn">NoContent</span>();
+    }
+
+    <span class="cmt">// DELETE api/products/5</span>
+    <span class="dec">[HttpDelete(<span class="str">"{id:int}"</span>)]</span>
+    <span class="kw">public async</span> Task&lt;<span class="cls">IActionResult</span>&gt; <span class="fn">Delete</span>(<span class="kw">int</span> id) {
+        <span class="kw">if</span> (!<span class="kw">await</span> _repo.<span class="fn">DeleteAsync</span>(id)) <span class="kw">return</span> <span class="fn">NotFound</span>();
+        <span class="kw">return</span> <span class="fn">NoContent</span>();
+    }
+}</pre>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Parametri dalla request</span></div>
+    <pre><span class="cmt">// GET api/items/42 (route)</span>
+<span class="kw">public</span> <span class="cls">IActionResult</span> <span class="fn">Get</span>(<span class="dec">[FromRoute]</span> <span class="kw">int</span> id)
+
+<span class="cmt">// GET api/items?page=1&size=20</span>
+<span class="kw">public</span> <span class="cls">IActionResult</span> <span class="fn">GetPaged</span>(
+    <span class="dec">[FromQuery]</span> <span class="kw">int</span> page,
+    <span class="dec">[FromQuery]</span> <span class="kw">int</span> size)
+
+<span class="cmt">// POST api/items  { "name": "..." }</span>
+<span class="kw">public</span> <span class="cls">IActionResult</span> <span class="fn">Post</span>(
+    <span class="dec">[FromBody]</span> <span class="cls">ItemDto</span> dto)</pre>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">Risposte standardizzate</span></div>
+    <pre><span class="fn">Ok</span>(data)           <span class="cmt">// 200</span>
+<span class="fn">Created</span>(uri, data)  <span class="cmt">// 201</span>
+<span class="fn">CreatedAtAction</span>(...)  <span class="cmt">// 201 + Location</span>
+<span class="fn">NoContent</span>()         <span class="cmt">// 204</span>
+<span class="fn">BadRequest</span>(ModelState) <span class="cmt">// 400</span>
+<span class="fn">Unauthorized</span>()      <span class="cmt">// 401</span>
+<span class="fn">Forbid</span>()            <span class="cmt">// 403</span>
+<span class="fn">NotFound</span>()          <span class="cmt">// 404</span>
+<span class="fn">StatusCode</span>(<span class="acc">500</span>, msg) <span class="cmt">// 500</span></pre>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Controller protetto con JWT</span><span class="card-tag tag-state">Auth</span></div>
+  <pre><span class="dec">[Authorize]</span>
+<span class="dec">[ApiController]</span>
+<span class="dec">[Route(<span class="str">"api/[controller]"</span>)]</span>
+<span class="kw">public class</span> <span class="cls">OrdersController</span> : <span class="cls">ControllerBase</span>
+{
+    <span class="dec">[HttpGet]</span>
+    <span class="kw">public</span> <span class="cls">IActionResult</span> <span class="fn">GetMine</span>() {
+        <span class="cmt">// Legge claim dal token decodificato</span>
+        <span class="kw">var</span> userId = User.<span class="fn">FindFirstValue</span>(ClaimTypes.NameIdentifier);
+        <span class="kw">return</span> <span class="fn">Ok</span>(userId);
+    }
+
+    <span class="dec">[AllowAnonymous]</span>
+    <span class="dec">[HttpGet(<span class="str">"public"</span>)]</span>
+    <span class="kw">public</span> <span class="cls">IActionResult</span> <span class="fn">Public</span>() =&gt; <span class="fn">Ok</span>(<span class="str">"visibile a tutti"</span>);
+}</pre>
+  <div class="card-body">
+    <p><strong>[Authorize]</strong> sul controller protegge tutti gli endpoint. <strong>[AllowAnonymous]</strong> su un singolo metodo sovrascrive la protezione per quell'endpoint specifico.</p>
+  </div>
+</div>
+</div>
+</body>
+</html>

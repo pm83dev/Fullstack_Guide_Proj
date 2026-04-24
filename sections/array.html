@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>array</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-purple">📦</div>
+        <div>
+          <div class="section-title">State per Array di Oggetti</div>
+          <div class="section-desc">La distinzione fondamentale: Domain Model ≠ State Model</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">data.interface.ts — separazione corretta</span>
+          <span class="card-tag tag-state">state</span>
+        </div>
+        <pre>
+<span class="cmt">// Domain model — rappresenta UN oggetto dell'API</span>
+<span class="kw">export interface</span> <span class="cls">DataItem</span> {
+  <span class="prop">id</span>: <span class="typ">number</span>;
+  <span class="prop">name</span>: <span class="typ">string</span>;
+  <span class="prop">value</span>: <span class="typ">string</span>;
+}
+
+<span class="cmt">// State model — forma dell'intero snapshot NGXS</span>
+<span class="kw">export interface</span> <span class="cls">DataStateModel</span> {
+  <span class="prop">items</span>: <span class="cls">DataItem</span>[];  <span class="cmt">// l'array come proprietà</span>
+  <span class="prop">loading</span>: <span class="typ">boolean</span>;
+  <span class="prop">error</span>: <span class="typ">string</span>;
+}</pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">data.state.ts — pattern corretto</span>
+          <span class="card-tag tag-state">state</span>
+        </div>
+        <pre>
+<span class="dec">@State</span>&lt;<span class="cls">DataStateModel</span>&gt;({   <span class="cmt">// &lt;-- DataStateModel, non DataItem!</span>
+  name: <span class="str">'data'</span>,
+  defaults: { items: [], loading: <span class="kw">false</span>, error: <span class="str">''</span> },
+})
+<span class="kw">export class</span> <span class="cls">DataState</span> {
+
+  <span class="dec">@Selector</span>()
+  <span class="kw">static</span> <span class="fn">items</span>(state: <span class="cls">DataStateModel</span>): <span class="cls">DataItem</span>[] {
+    <span class="kw">return</span> state.<span class="prop">items</span>;  <span class="cmt">// ritorna l'array direttamente</span>
+  }
+
+  <span class="dec">@Action</span>(<span class="cls">LoadApiData</span>)
+  <span class="fn">loadApiData</span>(ctx: <span class="cls">StateContext</span>&lt;<span class="cls">DataStateModel</span>&gt;) {
+    ctx.<span class="fn">patchState</span>({ loading: <span class="kw">true</span>, error: <span class="str">''</span> });
+    <span class="kw">return this</span>.<span class="prop">apiService</span>.<span class="fn">getData</span>().<span class="fn">pipe</span>(
+      <span class="fn">tap</span>((response) =&gt; {
+        ctx.<span class="fn">patchState</span>({ items: response.<span class="prop">items</span>, loading: <span class="kw">false</span> });
+      }),
+      <span class="fn">catchError</span>((error) =&gt; {
+        ctx.<span class="fn">patchState</span>({ loading: <span class="kw">false</span>, error: <span class="str">'Errore caricamento'</span> });
+        <span class="kw">return</span> <span class="fn">throwError</span>(() =&gt; error);
+      }),
+    );
+  }
+}</pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Errori comuni da evitare</span>
+        </div>
+        <table>
+          <tr><th>Errore</th><th>Problema</th><th>Fix</th></tr>
+          <tr><td>@State&lt;DataItem&gt;</td><td>Domain model invece di state model</td><td>@State&lt;DataStateModel&gt;</td></tr>
+          <tr><td>defaults: {id,name,value}</td><td>Proprietà di un item, non di uno stato</td><td>defaults: {items:[],loading,error}</td></tr>
+          <tr><td>StateContext&lt;DataResponse&gt;</td><td>Response API come contesto</td><td>StateContext&lt;DataStateModel&gt;</td></tr>
+          <tr><td>patchState({data: ...})</td><td>Chiave inesistente nel tipo</td><td>patchState({items: response.items})</td></tr>
+        </table>
+      </div>
+</div>
+</body>
+</html>

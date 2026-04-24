@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comandi Linux</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-green">🐧</div>
+  <div>
+    <div class="section-title">Comandi Linux Essenziali</div>
+    <div class="section-desc">Dal filesystem ai processi, dalla rete agli alias — WSL2 + Ubuntu 24.04</div>
+  </div>
+</div>
+
+<!-- 1. Navigazione -->
+<div class="card">
+  <div class="card-header"><span class="card-title">1 — Navigazione e Filesystem</span><span class="card-tag tag-pattern">navigazione</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Comando</th><th>Cosa fa</th></tr>
+      <tr><td>cd ~</td><td>Vai alla home (/home/nomeutente)</td></tr>
+      <tr><td>cd -</td><td>Torna alla cartella precedente</td></tr>
+      <tr><td>cd ../..</td><td>Sali di due livelli</td></tr>
+      <tr><td>ls -la</td><td>Lista dettagliata con file nascosti</td></tr>
+      <tr><td>ls -lh</td><td>Dimensioni leggibili (KB, MB, GB)</td></tr>
+      <tr><td>mkdir -p a/b/c</td><td>Crea cartelle annidate in un colpo solo</td></tr>
+      <tr><td>cp -r src/ dest/</td><td>Copia cartella intera (ricorsivo)</td></tr>
+      <tr><td>mv file.txt ~/altra/</td><td>Sposta un file in un'altra cartella</td></tr>
+      <tr><td>rm -rf cartella/</td><td>Elimina tutto senza conferma — usare con cautela!</td></tr>
+      <tr><td>find . -name '*.ts'</td><td>Trova tutti i file .ts nella directory corrente</td></tr>
+      <tr><td>du -sh cartella/</td><td>Dimensione totale di una cartella</td></tr>
+      <tr><td>df -h</td><td>Spazio disco disponibile su tutti i filesystem</td></tr>
+    </table>
+    <div class="rule-box">
+      <div class="rule-title">⚠ rm non ha cestino</div>
+      <div class="rule-text"><code>rm -rf</code> elimina subito e definitivamente — non va nel cestino. Prima di usarlo, verifica sempre il percorso con <code>pwd</code>.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. Leggere e cercare -->
+<div class="card">
+  <div class="card-header"><span class="card-title">2 — Leggere e Cercare nei File</span><span class="card-tag tag-action">grep</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Comando</th><th>Cosa fa</th></tr>
+      <tr><td>less file.txt</td><td>Visualizza il file paginato — q per uscire, /testo per cercare</td></tr>
+      <tr><td>head -n 20 file.txt</td><td>Mostra le prime 20 righe</td></tr>
+      <tr><td>tail -f app.log</td><td>Segue il file in tempo reale (fondamentale per i log)</td></tr>
+      <tr><td>wc -l file.txt</td><td>Conta le righe di un file</td></tr>
+      <tr><td>grep -i 'error' app.log</td><td>Cerca ignorando maiuscole/minuscole</td></tr>
+      <tr><td>grep -n 'error' app.log</td><td>Mostra anche il numero di riga</td></tr>
+      <tr><td>grep -r 'apiUrl' src/</td><td>Cerca ricorsivamente in tutti i file di una cartella</td></tr>
+      <tr><td>grep -v 'DEBUG' app.log</td><td>Mostra le righe che NON contengono 'DEBUG'</td></tr>
+      <tr><td>diff -u file1 file2</td><td>Differenze in formato unificato (come git diff)</td></tr>
+    </table>
+    <div class="info-box">
+      <div class="info-title">tail -f — il comando per i log</div>
+      <div class="rule-text">Rimane in ascolto e stampa ogni nuova riga appena viene scritta. Usalo per monitorare log di .NET, Nginx o qualsiasi servizio. Ctrl+C per uscire.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. Pipe e redirect -->
+<div class="card">
+  <div class="card-header"><span class="card-title">3 — Pipe, Redirect e Composizione</span><span class="card-tag tag-pattern">pipe</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Pipe: prende output di un comando e lo passa al successivo</span>
+ls -la | grep '.ts'
+cat app.log | grep 'ERROR' | wc -l
+ps aux | grep dotnet
+
+<span class="cmt"># Redirect: > sovrascrive, >> aggiunge in coda</span>
+dotnet build > build-output.txt 2>&1
+echo "$(date): avvio" >> deploy.log
+
+<span class="cmt"># Esecuzione condizionale</span>
+dotnet build && dotnet run   <span class="cmt"># cmd2 solo se cmd1 ha successo</span>
+ng serve &                   <span class="cmt"># avvia in background</span></pre>
+  </div>
+</div>
+
+<!-- 4. Permessi -->
+<div class="card">
+  <div class="card-header"><span class="card-title">4 — Permessi e Utenti</span><span class="card-tag tag-state">chmod</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Leggere i permessi</span>
+ls -la
+<span class="str">-rwxr-xr-- 1 paolo developers 4096 script.sh</span>
+<span class="cmt"># |||||||||||
+# |||||||||└─ altri      (r=leggi, -=no scrivi, -=no esegui)
+# ||||||└──── gruppo     (r=leggi, -=no scrivi, x=esegui)
+# |||└─────── proprietario (r=leggi, w=scrivi, x=esegui)</span></pre>
+    <table>
+      <tr><th>Comando</th><th>Cosa fa</th></tr>
+      <tr><td>chmod +x script.sh</td><td>Aggiunge permesso di esecuzione</td></tr>
+      <tr><td>chmod 755 script.sh</td><td>rwxr-xr-x — standard per script</td></tr>
+      <tr><td>chmod 644 file.txt</td><td>rw-r--r-- — standard per file di testo</td></tr>
+      <tr><td>chmod -R 755 cartella/</td><td>Applica ricorsivamente</td></tr>
+      <tr><td>sudo chown -R paolo dir/</td><td>Cambia proprietario ricorsivamente</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- 5. Processi -->
+<div class="card">
+  <div class="card-header"><span class="card-title">5 — Processi e Porte</span><span class="card-tag tag-component">processi</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Comando</th><th>Cosa fa</th></tr>
+      <tr><td>ps aux | grep dotnet</td><td>Filtra solo i processi dotnet</td></tr>
+      <tr><td>kill 1234</td><td>Termina il processo (SIGTERM — elegante)</td></tr>
+      <tr><td>kill -9 1234</td><td>Forza la chiusura immediata (SIGKILL — brutale)</td></tr>
+      <tr><td>pkill dotnet</td><td>Termina tutti i processi con nome 'dotnet'</td></tr>
+      <tr><td>ss -tlnp | grep 5035</td><td>Verifica se la porta 5035 è occupata</td></tr>
+      <tr><td>lsof -i :4200</td><td>Mostra il processo che usa la porta 4200</td></tr>
+      <tr><td>nohup dotnet run &gt; api.log 2&gt;&amp;1 &amp;</td><td>Avvia in background persistente</td></tr>
+      <tr><td>jobs / fg %1</td><td>Lista job in background / riporta in foreground</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- 6. Rete e curl -->
+<div class="card">
+  <div class="card-header"><span class="card-title">6 — Rete, curl e Trasferimento File</span><span class="card-tag tag-action">rete</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Test API dal terminale</span>
+curl <span class="str">http://localhost:5035/hello</span>
+curl -s <span class="str">http://localhost:5035/hello</span> | jq .   <span class="cmt"># JSON formattato</span>
+curl -X POST -H <span class="str">'Content-Type: application/json'</span> \
+     -d <span class="str">'{"nome":"paolo"}'</span> <span class="str">http://localhost:5035/api</span>
+
+<span class="cmt"># Con JWT</span>
+curl -X GET <span class="str">http://localhost:5035/api/dati</span> \
+     -H <span class="str">'Authorization: Bearer eyJ...'</span> | jq .
+
+<span class="cmt"># Trasferire file sul server</span>
+scp -r dist/ user@host:/var/www/
+rsync -avz ./dist/ user@host:/var/www/  <span class="cmt"># solo file modificati</span></pre>
+    <div class="info-box">
+      <div class="info-title">rsync vs scp per i deploy</div>
+      <div class="rule-text">Per copiare il build Angular sul server, <code>rsync</code> è molto più efficiente di <code>scp</code>: trasferisce solo i file modificati. Con connessioni lente fa una differenza enorme.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 7. Variabili e alias -->
+<div class="card">
+  <div class="card-header"><span class="card-title">7 — Variabili, .bashrc e Alias</span><span class="card-tag tag-pattern">config</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Variabili d'ambiente</span>
+<span class="kw">export</span> ASPNETCORE_ENVIRONMENT=Development
+ASPNETCORE_ENVIRONMENT=Production dotnet run  <span class="cmt"># solo per quel comando</span>
+
+<span class="cmt"># Aprire e ricaricare .bashrc</span>
+nano ~/.bashrc
+source ~/.bashrc
+
+<span class="cmt"># Alias consigliati — aggiungere a ~/.bashrc</span>
+<span class="kw">alias</span> ll=<span class="str">'ls -lah'</span>
+<span class="kw">alias</span> gs=<span class="str">'git status'</span>
+<span class="kw">alias</span> gl=<span class="str">'git log --oneline -10'</span>
+<span class="kw">alias</span> dps=<span class="str">'docker ps'</span>
+<span class="kw">alias</span> dcu=<span class="str">'docker compose up -d'</span>
+<span class="kw">alias</span> dcd=<span class="str">'docker compose down'</span>
+<span class="kw">alias</span> dev-api=<span class="str">'cd ~/progetti/ProvaWSL/ProvaWSL.Api && dotnet run'</span>
+<span class="kw">alias</span> dev-client=<span class="str">'cd ~/progetti/ProvaWSL/ProvaWSL.Client && ng serve'</span></pre>
+  </div>
+</div>
+
+<!-- 8. Git -->
+<div class="card">
+  <div class="card-header"><span class="card-title">8 — Git da Terminale Linux</span><span class="card-tag tag-service">git</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Comando</th><th>Cosa fa</th></tr>
+      <tr><td>git add -p</td><td>Aggiunge interattivamente — scegli chunk per chunk</td></tr>
+      <tr><td>git log --oneline -10</td><td>Ultimi 10 commit compatti</td></tr>
+      <tr><td>git diff --staged</td><td>Modifiche già in stage</td></tr>
+      <tr><td>git checkout -b feature/login</td><td>Crea e passa a un nuovo branch</td></tr>
+      <tr><td>git stash / git stash pop</td><td>Salva/ripristina modifiche temporanee</td></tr>
+      <tr><td>git restore .</td><td>Annulla tutte le modifiche non committate — irreversibile</td></tr>
+      <tr><td>git reset --soft HEAD~1</td><td>Annulla l'ultimo commit ma mantiene le modifiche</td></tr>
+    </table>
+    <div class="rule-box">
+      <div class="rule-title">Ctrl+R — ricerca nella history</div>
+      <div class="rule-text">Premi Ctrl+R e inizia a digitare parte di un comando: bash trova l'ultimo corrispondente. È probabilmente il shortcut più utile del terminale.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 9. Tool utili -->
+<div class="card">
+  <div class="card-header"><span class="card-title">9 — Tool Utili: jq, tar, history</span><span class="card-tag tag-modal">utility</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># jq — processare JSON da terminale</span>
+sudo apt install jq
+curl -s <span class="str">http://localhost:5035/api/items</span> | jq <span class="str">'.'</span>           <span class="cmt"># formatta</span>
+curl -s <span class="str">http://localhost:5035/api/items</span> | jq <span class="str">'.message'</span>     <span class="cmt"># campo specifico</span>
+curl -s <span class="str">http://localhost:5035/api/items</span> | jq <span class="str">'. | length'</span>   <span class="cmt"># conta elementi</span>
+
+<span class="cmt"># tar e zip</span>
+tar -czf archivio.tar.gz cartella/    <span class="cmt"># comprimi</span>
+tar -xzf archivio.tar.gz             <span class="cmt"># estrai</span>
+zip -r archivio.zip cartella/
+
+<span class="cmt"># history</span>
+history | grep dotnet  <span class="cmt"># cerca nei comandi passati</span>
+!!                     <span class="cmt"># ripete l'ultimo comando</span>
+sudo !!                <span class="cmt"># ripete l'ultimo con sudo</span></pre>
+  </div>
+</div>
+
+<!-- Cheatsheet -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Cheatsheet — I più usati</span><span class="card-tag tag-rule">quick ref</span></div>
+  <div class="card-body">
+    <div class="grid2">
+      <div>
+        <pre><span class="cmt"># Navigazione</span>
+cd ~        <span class="cmt"># home</span>
+cd -        <span class="cmt"># cartella precedente</span>
+ll          <span class="cmt"># ls -lah (alias)</span>
+pwd         <span class="cmt"># percorso corrente</span>
+
+<span class="cmt"># File</span>
+mkdir -p a/b/c
+cp -r src/ dest/
+rm -rf cartella/
+find . -name '*.log'</pre>
+      </div>
+      <div>
+        <pre><span class="cmt"># Processi e porte</span>
+ps aux | grep dotnet
+kill -9 $(pgrep dotnet)
+ss -tlnp | grep 5035
+cmd &        <span class="cmt"># background</span>
+
+<span class="cmt"># Rete e deploy</span>
+curl -s http://localhost:5035/hello | jq .
+rsync -avz dist/ user@vps:/var/www/
+
+<span class="cmt"># Bash tips</span>
+cmd1 && cmd2
+Ctrl+R        <span class="cmt"># cerca nella history</span>
+Tab           <span class="cmt"># autocomplete</span></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

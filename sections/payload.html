@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>payload</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-purple">📦</div>
+        <div>
+          <div class="section-title">action.payload</div>
+          <div class="section-desc">Come trasportare dati dal componente allo State — e tra azioni</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Direzione del flusso</span></div>
+        <div class="flow" style="margin-bottom:0">
+          <div class="flow-row">
+            <span class="flow-node fn-red">Component</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-label"><code>dispatch(new CreateUser(userData))</code> — payload parte da qui</span>
+          </div>
+          <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+          <div class="flow-row">
+            <span class="flow-node fn-orange">Action</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-label"><code>constructor(public payload: CreateUserDto) {}</code></span>
+          </div>
+          <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+          <div class="flow-row">
+            <span class="flow-node fn-purple">State</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-label"><code>action.payload</code> — ricevuto, usato per chiamare il service</span>
+          </div>
+          <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+          <div class="flow-row">
+            <span class="flow-node fn-green">Service/API</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-label">Risposta → nuova Action di successo con NUOVO payload</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Definizione azioni con payload</span></div>
+        <pre>
+<span class="cmt">// Payload singolo tipizzato</span>
+<span class="kw">export class</span> <span class="cls">CreateUser</span> {
+  <span class="kw">static readonly</span> type = <span class="str">'[User Form] Create User'</span>;
+  <span class="kw">constructor</span>(<span class="kw">public</span> payload: CreateUserDto) {}
+}
+
+<span class="cmt">// Payload multiplo (id + dati)</span>
+<span class="kw">export class</span> <span class="cls">UpdateUser</span> {
+  <span class="kw">static readonly</span> type = <span class="str">'[User Form] Update User'</span>;
+  <span class="kw">constructor</span>(<span class="kw">public</span> id: <span class="kw">string</span>, <span class="kw">public</span> payload: UpdateUserDto) {}
+}
+
+<span class="cmt">// Payload semplice</span>
+<span class="kw">export class</span> <span class="cls">DeleteUser</span> {
+  <span class="kw">static readonly</span> type = <span class="str">'[User List] Delete User'</span>;
+  <span class="kw">constructor</span>(<span class="kw">public</span> userId: <span class="kw">string</span>) {}
+}</pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Dispatch dal componente</span></div>
+        <pre>
+<span class="fn">createUser</span>() {
+  <span class="kw">const</span> newUser: CreateUserDto = { name: <span class="str">'Mario'</span>, email: <span class="str">'mario@example.com'</span> };
+  <span class="kw">this</span>.<span class="prop">store</span>.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">CreateUser</span>(newUser));
+}
+
+<span class="fn">updateUser</span>(id: <span class="kw">string</span>) {
+  <span class="kw">this</span>.<span class="prop">store</span>.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">UpdateUser</span>(id, { name: <span class="str">'Mario Updated'</span> }));
+}
+
+<span class="cmt">// Dispatch condizionale (add vs edit)</span>
+<span class="fn">saveUser</span>(userData: <span class="kw">any</span>) {
+  <span class="kw">const</span> action = userData.id
+    ? <span class="kw">new</span> <span class="cls">UpdateUser</span>(userData.id, userData)
+    : <span class="kw">new</span> <span class="cls">CreateUser</span>(userData);
+  <span class="kw">this</span>.<span class="prop">store</span>.<span class="fn">dispatch</span>(action);
+}</pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Accesso al payload nello State</span></div>
+        <pre>
+<span class="cmt">// Payload singolo</span>
+<span class="fn">@Action</span>(<span class="cls">CreateUser</span>)
+<span class="fn">createUser</span>(ctx: StateContext&lt;UserStateModel&gt;, action: <span class="cls">CreateUser</span>) {
+  <span class="kw">const</span> newUserData = action.payload;       <span class="cmt">// type: CreateUserDto</span>
+  <span class="kw">return this</span>.<span class="prop">userService</span>.<span class="fn">createUser</span>(newUserData).<span class="fn">pipe</span>(...);
+}
+
+<span class="cmt">// Payload multiplo con destrutturazione</span>
+<span class="fn">@Action</span>(<span class="cls">UpdateUser</span>)
+<span class="fn">updateUser</span>(ctx: StateContext&lt;UserStateModel&gt;, action: <span class="cls">UpdateUser</span>) {
+  <span class="kw">const</span> { id, payload: updateData } = action;
+  <span class="kw">return this</span>.<span class="prop">userService</span>.<span class="fn">updateUser</span>(id, updateData).<span class="fn">pipe</span>(...);
+}
+
+<span class="cmt">// Payload complesso con destrutturazione</span>
+<span class="fn">@Action</span>(<span class="cls">LoadUsers</span>)
+<span class="fn">loadUsers</span>(ctx: StateContext&lt;UserStateModel&gt;, action: <span class="cls">LoadUsers</span>) {
+  <span class="kw">const</span> { page, pageSize, filters } = action.payload;
+  ctx.<span class="fn">patchState</span>({ loading: <span class="kw">true</span> });
+  <span class="kw">return this</span>.<span class="prop">userService</span>.<span class="fn">getUsers</span>(page, pageSize, filters).<span class="fn">pipe</span>(...);
+}</pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">✅ DO / ❌ DON'T</span></div>
+        <table>
+          <tr><th>DO ✅</th><th>DON'T ❌</th></tr>
+          <tr><td>Tipi forti per il payload</td><td>Mai <code>payload: any</code></td></tr>
+          <tr><td>Payload piccoli e focalizzati</td><td>Non mettere tutto in un'unica azione</td></tr>
+          <tr><td>Immutabilità: crea una copia se modifichi</td><td>Non scrivere <code>action.payload.name = '...'</code></td></tr>
+          <tr><td>Passa solo l'ID se l'oggetto è già nello store</td><td>Non ripassare oggetti che il componente ha già preso dallo store</td></tr>
+        </table>
+      </div>
+</div>
+</body>
+</html>

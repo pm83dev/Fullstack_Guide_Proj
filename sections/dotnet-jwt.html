@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dotnet-jwt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+  <div class="section-icon icon-orange">🔐</div>
+  <div>
+    <div class="section-title">JWT Authentication</div>
+    <div class="section-desc">Generazione token, claims, login endpoint, BCrypt password hashing</div>
+  </div>
+</div>
+
+<div class="info-box">
+  <div class="info-title">ℹ️ Come funziona il flusso JWT</div>
+  <div class="rule-text">
+    <div class="flow">
+      <div class="flow-row"><span class="flow-node fn-orange">POST /api/auth/login</span><span class="flow-arrow">→</span><span class="flow-label">email + password in body</span></div>
+      <div class="flow-row"><span class="flow-node fn-blue">BCrypt.Verify()</span><span class="flow-arrow">→</span><span class="flow-label">confronta con hash nel DB</span></div>
+      <div class="flow-row"><span class="flow-node fn-purple">TokenService.Generate()</span><span class="flow-arrow">→</span><span class="flow-label">crea JWT firmato con claims</span></div>
+      <div class="flow-row"><span class="flow-node fn-green">{ token: "..." }</span><span class="flow-arrow">→</span><span class="flow-label">Angular salva nello store NGXS</span></div>
+      <div class="flow-row"><span class="flow-node fn-cyan">JWT Interceptor</span><span class="flow-arrow">→</span><span class="flow-label">allega Authorization: Bearer a ogni request</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">TokenService — generazione JWT</span><span class="card-tag tag-pattern">C#</span></div>
+  <pre><span class="cmt">// Services/TokenService.cs</span>
+<span class="kw">public class</span> <span class="cls">TokenService</span> {
+    <span class="kw">private readonly</span> <span class="cls">IConfiguration</span> _cfg;
+    <span class="kw">public</span> <span class="cls">TokenService</span>(<span class="cls">IConfiguration</span> cfg) =&gt; _cfg = cfg;
+
+    <span class="kw">public string</span> <span class="fn">Generate</span>(<span class="cls">User</span> user) {
+        <span class="kw">var</span> key  = <span class="kw">new</span> <span class="cls">SymmetricSecurityKey</span>(
+            Encoding.UTF8.<span class="fn">GetBytes</span>(_cfg[<span class="str">"Jwt:Key"</span>]!));
+        <span class="kw">var</span> cred = <span class="kw">new</span> <span class="cls">SigningCredentials</span>(key, SecurityAlgorithms.HmacSha256);
+
+        <span class="kw">var</span> claims = <span class="kw">new</span>[] {
+            <span class="kw">new</span> <span class="cls">Claim</span>(ClaimTypes.NameIdentifier, user.Id.<span class="fn">ToString</span>()),
+            <span class="kw">new</span> <span class="cls">Claim</span>(ClaimTypes.Email, user.Email),
+            <span class="kw">new</span> <span class="cls">Claim</span>(ClaimTypes.Role, user.Role)
+        };
+
+        <span class="kw">var</span> token = <span class="kw">new</span> <span class="cls">JwtSecurityToken</span>(
+            expires: DateTime.UtcNow.<span class="fn">AddHours</span>(<span class="acc">8</span>),
+            signingCredentials: cred,
+            claims: claims);
+
+        <span class="kw">return new</span> <span class="cls">JwtSecurityTokenHandler</span>().<span class="fn">WriteToken</span>(token);
+    }
+}</pre>
+  <div class="card-body">
+    <p>⚠️ La chiave JWT deve avere <strong>almeno 32 caratteri</strong> (256 bit per HMAC-SHA256). Una chiave troppo corta causa un'eccezione a runtime. Non usare mai la stessa chiave in sviluppo e produzione.</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Login endpoint</span><span class="card-tag tag-action">POST</span></div>
+  <pre><span class="dec">[AllowAnonymous]</span>
+<span class="dec">[HttpPost(<span class="str">"login"</span>)]</span>
+<span class="kw">public async</span> Task&lt;<span class="cls">IActionResult</span>&gt; <span class="fn">Login</span>(<span class="dec">[FromBody]</span> <span class="cls">LoginDto</span> dto) {
+    <span class="kw">var</span> user = <span class="kw">await</span> _userRepo.<span class="fn">FindByEmailAsync</span>(dto.Email);
+
+    <span class="cmt">// Messaggio generico: non rivelare se è email o password errata</span>
+    <span class="kw">if</span> (user <span class="kw">is null</span> || !BCrypt.<span class="fn">Verify</span>(dto.Password, user.PasswordHash))
+        <span class="kw">return</span> <span class="fn">Unauthorized</span>();
+
+    <span class="kw">var</span> token = _tokenService.<span class="fn">Generate</span>(user);
+    <span class="kw">return</span> <span class="fn">Ok</span>(<span class="kw">new</span> { token });
+}
+
+<span class="cmt">// DTO</span>
+<span class="kw">public record</span> <span class="cls">LoginDto</span>(<span class="kw">string</span> Email, <span class="kw">string</span> Password);</pre>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Claims disponibili lato controller</span></div>
+  <pre><span class="cmt">// Legge l'ID utente dal token</span>
+<span class="kw">var</span> userId = User.<span class="fn">FindFirstValue</span>(ClaimTypes.NameIdentifier);
+
+<span class="cmt">// Legge email</span>
+<span class="kw">var</span> email = User.<span class="fn">FindFirstValue</span>(ClaimTypes.Email);
+
+<span class="cmt">// Legge ruolo (usato con [Authorize(Roles = "Admin")])</span>
+<span class="kw">var</span> role = User.<span class="fn">FindFirstValue</span>(ClaimTypes.Role);</pre>
+  <div class="card-body">
+    <p>I claims sono disponibili tramite <code>User</code> (ClaimsPrincipal) in qualsiasi controller con <code>[Authorize]</code>. Il token viene decodificato automaticamente dal middleware JWT — nessun codice aggiuntivo richiesto.</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Hashing password con BCrypt</span></div>
+  <pre><span class="cmt"># Installa pacchetto</span>
+dotnet add MyProject.Api package BCrypt.Net-Next
+
+<span class="cmt">// Hash alla registrazione utente</span>
+user.PasswordHash = BCrypt.<span class="fn">HashPassword</span>(plainTextPassword);
+
+<span class="cmt">// Verifica al login</span>
+<span class="kw">bool</span> valid = BCrypt.<span class="fn">Verify</span>(plainTextPassword, user.PasswordHash);</pre>
+  <div class="card-body">
+    <p>BCrypt include il salt nell'hash — non serve memorizzarlo separatamente. <code>Verify()</code> lo estrae e confronta internamente.</p>
+  </div>
+</div>
+</div>
+</body>
+</html>

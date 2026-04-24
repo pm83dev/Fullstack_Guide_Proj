@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rxjs-avanzato</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-blue">⚡</div>
+        <div>
+          <div class="section-title">RxJS — Operatori Avanzati</div>
+          <div class="section-desc">map, switchMap, takeUntil, ofActionSuccessful — quando e perché</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Operatori in un colpo d'occhio</span></div>
+        <table>
+          <tr><th>Operatore</th><th>Cosa fa</th><th>Quando usarlo</th></tr>
+          <tr><td>map</td><td>Trasforma ogni valore che passa</td><td>Filtrare array, cambiare forma del dato, conteggi</td></tr>
+          <tr><td>tap</td><td>Side effect senza toccare il valore</td><td>patchState, console.log, aggiornare stato loading</td></tr>
+          <tr><td>catchError</td><td>Intercetta errore, ritorna Observable alternativo</td><td>Sempre negli @Action asincroni</td></tr>
+          <tr><td>switchMap</td><td>Riceve valore → ritorna nuovo Observable, cancella il precedente</td><td>Incatenare HTTP, ricerche live (annulla la precedente)</td></tr>
+          <tr><td>takeUntil</td><td>Completa il flusso quando un altro Observable emette</td><td>Unsubscribe automatico al destroy del componente</td></tr>
+          <tr><td>of(value)</td><td>Observable che emette subito e completa</td><td>Ritorno di fallback in catchError</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">map — trasforma il valore</span></div>
+        <pre>
+<span class="kw">this</span>.<span class="prop">api</span>.<span class="fn">getVariables</span>().<span class="fn">pipe</span>(
+  <span class="fn">map</span>(vars => vars.<span class="fn">filter</span>(v => v.<span class="prop">active</span> === <span class="kw">true</span>)), <span class="cmt">// tieni solo le attive</span>
+  <span class="fn">map</span>(vars => vars.<span class="prop">length</span>) <span class="cmt">// solo il conteggio</span>
+)
+<span class="cmt">// Observable&lt;OpcVariable[]&gt; → Observable&lt;number&gt;</span></pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">switchMap — incatena HTTP calls</span></div>
+        <pre>
+<span class="cmt">// Scenario: seleziono un plant → carico le sue variabili</span>
+<span class="kw">this</span>.<span class="prop">store</span>.<span class="fn">select</span>(<span class="cls">PlantState</span>.<span class="fn">getSelectedId</span>).<span class="fn">pipe</span>(
+  <span class="fn">switchMap</span>(id => <span class="kw">this</span>.<span class="prop">api</span>.<span class="fn">getVariablesByPlant</span>(id))
+)
+<span class="cmt">// Se arriva un nuovo id prima che finisca la prima chiamata,</span>
+<span class="cmt">// switchMap CANCELLA la precedente e parte con la nuova. ✅</span></pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">takeUntil — unsubscribe automatico</span></div>
+        <pre>
+<span class="kw">private</span> <span class="prop">destroy$</span> = <span class="kw">new</span> <span class="cls">Subject</span>&lt;<span class="kw">void</span>&gt;();
+
+<span class="fn">ngOnInit</span>() {
+  <span class="kw">this</span>.<span class="prop">store</span>.<span class="fn">select</span>(<span class="cls">PlantState</span>.<span class="fn">getVariables</span>).<span class="fn">pipe</span>(
+    <span class="fn">takeUntil</span>(<span class="kw">this</span>.<span class="prop">destroy$</span>) <span class="cmt">// si disiscrive quando destroy$ emette</span>
+  ).<span class="fn">subscribe</span>(vars => <span class="kw">this</span>.<span class="fn">doSomething</span>(vars));
+}
+
+<span class="fn">ngOnDestroy</span>() {
+  <span class="kw">this</span>.<span class="prop">destroy$</span>.<span class="fn">next</span>();
+  <span class="kw">this</span>.<span class="prop">destroy$</span>.<span class="fn">complete</span>();
+}
+<span class="cmt">// Alternativa moderna: takeUntilDestroyed() da @angular/core/rxjs-interop</span></pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">ofActionSuccessful — reagire fuori dallo State</span></div>
+        <pre>
+<span class="cmt">// Nel costruttore di un service / effects class</span>
+<span class="kw">this</span>.<span class="prop">actions$</span>.<span class="fn">pipe</span>(
+  <span class="fn">ofActionSuccessful</span>(<span class="cls">AddVariable</span>),
+  <span class="fn">takeUntil</span>(<span class="kw">this</span>.<span class="prop">destroy$</span>)
+).<span class="fn">subscribe</span>(() => {
+  <span class="kw">this</span>.<span class="prop">snackbar</span>.<span class="fn">open</span>(<span class="str">'Variabile aggiunta'</span>, <span class="str">'OK'</span>, { duration: <span class="num">3000</span> });
+});
+<span class="cmt">// Usa per: notifiche UI, navigazione, logging — NON per logica di business</span></pre>
+        <table style="margin-top:10px">
+          <tr><th>Variante</th><th>Quando scatta</th></tr>
+          <tr><td>ofActionDispatched</td><td>Appena l'Action viene dispatchata (prima dell'esecuzione)</td></tr>
+          <tr><td>ofActionSuccessful</td><td>Dopo che lo State l'ha gestita senza errori</td></tr>
+          <tr><td>ofActionErrored</td><td>Se il gestore ha lanciato un'eccezione</td></tr>
+        </table>
+      </div>
+</div>
+</body>
+</html>

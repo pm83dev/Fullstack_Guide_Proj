@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>component</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-red">🖼️</div>
+        <div>
+          <div class="section-title">Component</div>
+          <div class="section-desc">Dispatcha azioni. Legge lo stato con @Select o selectSnapshot. Il template usa async pipe.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">product.component.ts</span>
+          <span class="card-tag tag-component">component</span>
+        </div>
+        <pre>
+<span class="dec">@Component</span>({
+  selector: <span class="str">'app-product'</span>,
+  template: `
+    &lt;div *ngFor="let product of products$ | async"&gt;
+      {{ product.name }}
+    &lt;/div&gt;
+  `,
+})
+<span class="kw">export class</span> <span class="cls">ProductComponent</span> <span class="kw">implements</span> OnInit {
+  <span class="cmt">// Lettura reattiva — si aggiorna automaticamente</span>
+  <span class="dec">@Select</span>(<span class="cls">ProductState</span>.<span class="prop">products</span>) <span class="prop">products$</span>!: <span class="cls">Observable</span>&lt;<span class="cls">IProduct</span>[]&gt;;
+
+  <span class="fn">constructor</span>(<span class="kw">private</span> <span class="prop">store</span>: <span class="cls">Store</span>) {}
+
+  <span class="fn">ngOnInit</span>(): <span class="typ">void</span> {
+    <span class="cmt">// Dispatch con payload opzionale</span>
+    <span class="kw">this</span>.<span class="prop">store</span>.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">GetProductsAction</span>({ search: <span class="str">'shirt'</span>, sortBy: <span class="str">'asc'</span> }));
+  }
+}
+
+<span class="cmt">// selectSnapshot = lettura sincrona one-shot (es: ngOnInit, guard)</span>
+<span class="kw">const</span> user = <span class="kw">this</span>.<span class="prop">store</span>.<span class="fn">selectSnapshot</span>(<span class="cls">AuthState</span>.<span class="prop">user</span>);</pre>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">@Select vs selectSnapshot</span></div>
+          <table>
+            <tr><th>Metodo</th><th>Quando</th></tr>
+            <tr><td>@Select</td><td>Template reattivo con async pipe</td></tr>
+            <tr><td>selectSnapshot</td><td>Lettura sincrona one-shot in ngOnInit, metodi</td></tr>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">regola ngModel</span></div>
+          <div class="card-body">
+            <p><span class="badge">[(ngModel)]</span> solo per proprietà semplici</p>
+            <p><span class="badge">[ngModel]</span> + <span class="badge">(ngModelChange)</span> per tutto il resto</p>
+          </div>
+        </div>
+      </div>
+</div>
+</body>
+</html>

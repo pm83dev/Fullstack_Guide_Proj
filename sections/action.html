@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>action</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-blue">⚡</div>
+        <div>
+          <div class="section-title">Action</div>
+          <div class="section-desc">Classi che rappresentano eventi o comandi. Il payload viaggia nel costruttore.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">product.action.ts</span>
+          <span class="card-tag tag-action">action</span>
+        </div>
+        <pre>
+<span class="cmt">// product.action.ts</span>
+<span class="kw">export class</span> <span class="cls">GetProductsAction</span> {
+  <span class="kw">static readonly</span> <span class="prop">type</span> = <span class="str">'[Product] Get Products'</span>;
+  <span class="fn">constructor</span>(<span class="kw">public</span> <span class="prop">payload</span>?: any) {}
+}
+
+<span class="kw">export class</span> <span class="cls">GetProductByIdAction</span> {
+  <span class="kw">static readonly</span> <span class="prop">type</span> = <span class="str">'[Product] Get Product By ID'</span>;
+  <span class="fn">constructor</span>(<span class="kw">public</span> <span class="prop">id</span>: <span class="typ">number</span>) {}
+}
+
+<span class="cmt">// Auth example</span>
+<span class="kw">export class</span> <span class="cls">LoginSuccess</span> {
+  <span class="kw">static readonly</span> <span class="prop">type</span> = <span class="str">'[Auth] Login Success'</span>;
+  <span class="fn">constructor</span>(<span class="kw">public</span> <span class="prop">user</span>: <span class="cls">User</span>, <span class="kw">public</span> <span class="prop">token</span>: <span class="typ">string</span>) {}
+}</pre>
+      </div>
+
+      <div class="info-box">
+        <div class="info-title">💡 Convenzione naming</div>
+        <p>Il <code>type</code> segue il pattern <strong>[Contesto] Verbo Oggetto</strong>. Es: <code>[Product] Get Products</code>, <code>[Auth] Login Success</code>. Serve per il DevTools di NGXS.</p>
+      </div>
+</div>
+</body>
+</html>

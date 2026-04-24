@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>flusso</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-orange">🔄</div>
+        <div>
+          <div class="section-title">Flusso Completo NGXS</div>
+          <div class="section-desc">Service → Action → State → Component: la pipeline intera in un colpo d'occhio</div>
+        </div>
+      </div>
+
+      <!-- FLOW DIAGRAM -->
+      <div class="flow">
+        <div class="flow-row">
+          <span class="flow-node fn-red">Component</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-label">store.dispatch(new GetProductsAction(...))</span>
+        </div>
+        <div class="flow-row" style="margin-left:20px">
+          <span class="flow-arrow">↓</span>
+        </div>
+        <div class="flow-row">
+          <span class="flow-node fn-purple">State</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-label">@Action intercetta, chiama service</span>
+        </div>
+        <div class="flow-row" style="margin-left:20px">
+          <span class="flow-arrow">↓</span>
+        </div>
+        <div class="flow-row">
+          <span class="flow-node fn-green">Service</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-label">HTTP GET → ritorna Observable&lt;IModel&gt;</span>
+        </div>
+        <div class="flow-row" style="margin-left:20px">
+          <span class="flow-arrow">↓</span>
+        </div>
+        <div class="flow-row">
+          <span class="flow-node fn-purple">State</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-label">tap() → ctx.patchState({ products: result.data })</span>
+        </div>
+        <div class="flow-row" style="margin-left:20px">
+          <span class="flow-arrow">↓</span>
+        </div>
+        <div class="flow-row">
+          <span class="flow-node fn-red">Component</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-label">@Select(ProductState.products) products$ → async pipe</span>
+        </div>
+      </div>
+
+      <!-- TABELLA RUOLI -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Ruolo di ciascun layer</span>
+        </div>
+        <table>
+          <tr><th>Layer</th><th>File</th><th>Responsabilità</th></tr>
+          <tr><td>Service</td><td>product.service.ts</td><td>Chiama l'API, ritorna Observable</td></tr>
+          <tr><td>Action</td><td>product.action.ts</td><td>Classe-evento che trasporta i parametri</td></tr>
+          <tr><td>State</td><td>product.state.ts</td><td>Gestisce azioni, aggiorna stato con patchState()</td></tr>
+          <tr><td>Component</td><td>product.component.ts</td><td>Dispatcha azioni, legge stato con @Select / selectSnapshot</td></tr>
+        </table>
+      </div>
+
+      <!-- FLUSSO ORDINE (esempio reale) -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Esempio reale — flusso Cart → API</span>
+          <span class="card-tag tag-pattern">pattern</span>
+        </div>
+        <pre>
+Cart
+  → <span class="fn">store.dispatch</span>(<span class="kw">new</span> <span class="cls">InsertOrderAction</span>(...))
+
+NGXS → intercetta <span class="cls">InsertOrderAction</span>
+
+OrderState
+  → esegue <span class="fn">this.orderService.insertOrder</span>(payload)
+
+OrderService
+  → HTTP POST al backend
+
+Backend → risponde 200 oppure errore
+
+Cart.<span class="fn">subscribe</span>(...)
+  → <span class="kw">next</span>: svuota carrello + apri modale
+  → <span class="kw">error</span>: mostra messaggio errore</pre>
+      </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WSL2 + VS Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-cyan">🔧</div>
+  <div>
+    <div class="section-title">WSL2 + VS Code + .NET + Angular</div>
+    <div class="section-desc">Setup completo, problematiche risolte, migrazione progetti</div>
+  </div>
+</div>
+
+<!-- Architettura -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Architettura WSL2</span><span class="card-tag tag-pattern">setup</span></div>
+  <div class="card-body">
+    <pre><span class="cls">Windows</span>
+├── VS Code (UI, editor, estensioni)
+├── Docker Desktop (usa WSL2 come backend)
+└── <span class="cls">WSL2</span> (Ubuntu 24.04)
+    ├── filesystem Linux (/home/user/...)
+    ├── runtime: dotnet, node, git, npm...
+    └── Docker Engine</pre>
+    <div class="info-box">
+      <div class="info-title">Quando NON conviene</div>
+      <div class="rule-text">Se usi software industriale, CAD, tool vendor-specific per PLC/SCADA su Windows, WSL2 è la soluzione ideale: sviluppo Linux + Windows per tutto il resto.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Setup iniziale -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Setup Iniziale WSL2</span><span class="card-tag tag-service">verifica</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Da PowerShell — verifica WSL2 installato</span>
+wsl --list --verbose
+
+<span class="cmt"># Output atteso:</span>
+<span class="str">  NAME      STATE    VERSION
+* Ubuntu    Stopped  2</span>
+
+<span class="cmt"># Installare Ubuntu se non presente</span>
+wsl --install -d Ubuntu
+
+<span class="cmt"># Reset password dimenticata</span>
+wsl -u root
+passwd nomeutente
+exit</pre>
+    <div class="rule-box">
+      <div class="rule-title">Nota</div>
+      <div class="rule-text">Le distro <code>docker-desktop</code> e <code>docker-desktop-data</code> sono interne a Docker — non usarle per sviluppare. Serve una distro Ubuntu/Debian propria.</div>
+    </div>
+  </div>
+</div>
+
+<!-- VS Code -->
+<div class="card">
+  <div class="card-header"><span class="card-title">VS Code con Estensione WSL</span><span class="card-tag tag-action">vscode</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Passaggi setup:</span>
+<span class="str">1.</span> Installa VS Code su Windows normalmente
+<span class="str">2.</span> Estensioni → cerca "WSL" (Microsoft) → Installa
+<span class="str">3.</span> In basso a sinistra → "Open a Remote Window" (icona ><)
+<span class="str">4.</span> "Connect to WSL" → barra diventa verde con "WSL: Ubuntu"
+
+<span class="cmt"># Aprire VS Code da terminale WSL</span>
+cd ~/progetti/mio-progetto
+code .    <span class="cmt"># apre VS Code su Windows connesso al filesystem Linux</span></pre>
+    <div class="info-box">
+      <div class="info-title">Dove mettere i progetti</div>
+      <div class="rule-text">Usa <code>~/progetti/...</code> (filesystem Linux) per performance ottimali. <code>/mnt/c/Users/...</code> funziona ma ha I/O lento su build con molti file (node_modules).</div>
+    </div>
+  </div>
+</div>
+
+<!-- Migrazione progetto -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Migrazione Progetto da Windows a WSL</span><span class="card-tag tag-pattern">migrazione</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Copia il progetto nel filesystem Linux</span>
+cp -r /mnt/c/Users/paolo/progetti/mio-progetto ~/progetti/
+cd ~/progetti/mio-progetto</pre>
+    <p>La Git history viene copiata integralmente. I remote URL rimangono validi.</p>
+    <pre><span class="cmt"># File .gitattributes — forza LF nel repository (standard Windows/Linux)</span>
+* text=auto eol=lf
+
+<span class="cmt"># File .editorconfig</span>
+root = true
+[*]
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+<span class="cmt"># Normalizzare un repo esistente con CRLF</span>
+git add --renormalize .
+git commit -m <span class="str">'chore: normalize line endings to LF'</span></pre>
+  </div>
+</div>
+
+<!-- Installazione stack -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Installazione Stack in WSL</span><span class="card-tag tag-service">install</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># .NET SDK</span>
+sudo apt install dotnet-sdk-8.0
+
+<span class="cmt"># Node.js via NVM (consigliato — no sudo per pacchetti globali)</span>
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.bashrc
+nvm install --lts
+
+<span class="cmt"># Angular CLI</span>
+npm install -g @angular/cli</pre>
+  </div>
+</div>
+
+<!-- Struttura progetto -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Struttura Progetto .NET + Angular</span><span class="card-tag tag-state">struttura</span></div>
+  <div class="card-body">
+    <pre>~/progetti/ProvaWSL/
+├── ProvaWSL.Api/          (.NET 8 Web API)
+├── ProvaWSL.Client/       (Angular 21 + NGXS)
+└── ProvaWSL.sln
+
+<span class="cmt"># Creazione</span>
+mkdir ~/progetti/ProvaWSL && cd ~/progetti/ProvaWSL
+dotnet new sln -n ProvaWSL
+dotnet new webapi -n ProvaWSL.Api
+dotnet sln add ProvaWSL.Api/ProvaWSL.Api.csproj
+
+ng new ProvaWSL.Client --routing --style=scss
+cd ProvaWSL.Client
+npm install @ngxs/store @ngxs/logger-plugin @ngxs/devtools-plugin</pre>
+  </div>
+</div>
+
+<!-- Problematiche Angular 21 -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Problemi Noti Angular 21 + NGXS</span><span class="card-tag tag-component">fix</span></div>
+  <div class="card-body">
+
+    <div class="rule-box">
+      <div class="rule-title">Problema 1 — SSR abilitato di default</div>
+      <div class="rule-text">Angular 21 genera con Server Side Rendering abilitato. NGXS non è compatibile con SSR.<br>
+      <strong>Soluzione:</strong> in <code>angular.json → architect → build → options</code> rimuovere le chiavi <code>server</code>, <code>outputMode</code> e <code>ssr</code>.</div>
+    </div>
+
+    <div class="rule-box">
+      <div class="rule-title">Problema 2 — Zone.js non installato</div>
+      <div class="rule-text">Angular 21 è zoneless di default. NGXS richiede zone.js.<br>
+      <strong>Soluzione:</strong> <code>npm install zone.js</code> + aggiungere <code>"polyfills": ["zone.js"]</code> in angular.json.</div>
+    </div>
+
+    <div class="rule-box">
+      <div class="rule-title">Problema 3 — Naming convention cambiata</div>
+      <div class="rule-text">In Angular 21 il componente root si chiama <code>App</code> (non <code>AppComponent</code>) e il file è <code>app.ts</code> (non <code>app.component.ts</code>).</div>
+    </div>
+
+    <div class="rule-box">
+      <div class="rule-title">Problema 4 — CORS bloccato</div>
+      <div class="rule-text">Il browser blocca le richieste da localhost:4200 verso localhost:5035.<br>
+      <strong>Soluzione:</strong> aggiungere la policy CORS in <code>Program.cs</code> (vedi sezione .NET → Program.cs).</div>
+    </div>
+
+    <div class="rule-box">
+      <div class="rule-title">Problema 5 — MapControllers mancante</div>
+      <div class="rule-text">Il template webapi usa Minimal API. Per i controller aggiungere in Program.cs:<br>
+      <code>builder.Services.AddControllers();</code> e <code>app.MapControllers();</code></div>
+    </div>
+  </div>
+</div>
+
+<!-- Workflow terminali -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Workflow Terminali Consigliato</span><span class="card-tag tag-modal">workflow</span></div>
+  <div class="card-body">
+    <p>Usa Windows Terminal su un secondo monitor con due tab Ubuntu separate:</p>
+    <table>
+      <tr><th>Terminale</th><th>Comando</th></tr>
+      <tr><td>Tab 1 — Backend</td><td><code>cd ~/progetti/ProvaWSL/ProvaWSL.Api && dotnet run</code></td></tr>
+      <tr><td>Tab 2 — Frontend</td><td><code>cd ~/progetti/ProvaWSL/ProvaWSL.Client && ng serve</code></td></tr>
+      <tr><td>VS Code</td><td><code>code ~/progetti/ProvaWSL</code> — solo per editare il codice</td></tr>
+    </table>
+    <div class="info-box">
+      <div class="info-title">Accedere ai file WSL da Windows Explorer</div>
+      <div class="rule-text">File Explorer espone i file WSL come share di rete: <code>\\wsl$\Ubuntu\home\nomeutente\progetti</code></div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

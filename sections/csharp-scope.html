@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C# — Scope e Blocchi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-orange">📐</div>
+  <div>
+    <div class="section-title">C# — Scope e Blocchi</div>
+    <div class="section-desc">Blocchi dichiarativi vs blocchi di esecuzione, inizializzatori, regola mentale</div>
+  </div>
+</div>
+
+<!-- Regola mentale -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Regola Mentale</span><span class="card-tag tag-rule">concetto</span></div>
+  <div class="card-body">
+    <div class="rule-box">
+      <div class="rule-title">Scopo dichiarativo → solo dichiarazioni, zero codice eseguibile</div>
+      <div class="rule-text">I blocchi di <code>namespace</code>, <code>class</code>, <code>interface</code>, <code>struct</code> contengono <strong>solo dichiarazioni di membri</strong>: campi, proprietà, metodi, eventi. Non puoi scrivere <code>Console.WriteLine()</code> o assegnazioni fuori da un metodo.</div>
+    </div>
+    <div class="rule-box" style="margin-top:10px">
+      <div class="rule-title">Scopo di esecuzione → codice eseguibile permesso</div>
+      <div class="rule-text">I metodi, costruttori, property body, lambda, blocchi <code>if/for/while</code> eseguono logica. Qui va il codice di business.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Blocchi dichiarativi -->
+<div class="card">
+  <div class="card-header"><span class="card-title">1. Blocchi Dichiarativi — Solo Dichiarazioni</span><span class="card-tag tag-state">declarative</span></div>
+  <div class="card-body">
+    <pre><span class="kw">namespace</span> N
+{
+    <span class="kw">class</span> <span class="cls">C</span>
+    {
+        <span class="cmt">// ✅ Solo dichiarazioni di membri</span>
+        <span class="typ">int</span> x;
+        <span class="typ">string</span> name;
+        <span class="kw">public void</span> <span class="fn">Metodo</span>() { }
+
+        <span class="cmt">// ❌ Questo NON è valido qui:</span>
+        <span class="cmt">// Console.WriteLine("errore");</span>
+        <span class="cmt">// x = 5;</span>
+    }
+}
+
+<span class="kw">interface</span> <span class="cls">I</span>
+{
+    <span class="cmt">// Solo firme di metodi/proprietà</span>
+    <span class="kw">void</span> <span class="fn">Esegui</span>();
+    <span class="typ">string</span> Nome { <span class="kw">get</span>; }
+}
+
+<span class="kw">struct</span> <span class="cls">S</span>
+{
+    <span class="cmt">// Solo dichiarazioni</span>
+    <span class="kw">public</span> <span class="typ">int</span> X;
+    <span class="kw">public</span> <span class="typ">int</span> Y;
+}</pre>
+  </div>
+</div>
+
+<!-- Blocchi di esecuzione -->
+<div class="card">
+  <div class="card-header"><span class="card-title">2. Blocchi di Esecuzione — Logica Eseguibile</span><span class="card-tag tag-action">execution</span></div>
+  <div class="card-body">
+    <pre><span class="kw">void</span> <span class="fn">Metodo</span>()
+{
+    <span class="cmt">// ✅ Istruzioni eseguibili</span>
+    <span class="cls">Console</span>.<span class="fn">WriteLine</span>(<span class="str">"Esempio"</span>);
+    <span class="typ">int</span> x = <span class="num">5</span>;
+}
+
+<span class="cls">MyClass</span>()  <span class="cmt">// costruttore</span>
+{
+    <span class="cmt">// ✅ Istruzioni eseguibili</span>
+    _service = <span class="kw">new</span> <span class="cls">Service</span>();
+}
+
+<span class="kw">if</span> (condizione)
+{
+    <span class="cmt">// ✅ Istruzioni eseguibili</span>
+    <span class="fn">DoSomething</span>();
+}
+
+<span class="kw">for</span> (<span class="typ">int</span> i = <span class="num">0</span>; i &lt; <span class="num">10</span>; i++)
+{
+    <span class="cmt">// ✅ Istruzioni eseguibili</span>
+    <span class="fn">Process</span>(i);
+}</pre>
+  </div>
+</div>
+
+<!-- Inizializzatori -->
+<div class="card">
+  <div class="card-header"><span class="card-title">3. Inizializzatori — Eccezione Consentita nella Classe</span><span class="card-tag tag-pattern">inizializzatori</span></div>
+  <div class="card-body">
+    <pre><span class="kw">public class</span> <span class="cls">C</span>
+{
+    <span class="cmt">// ✅ Inizializzatori: consentiti direttamente nel corpo classe</span>
+    <span class="kw">public</span> <span class="typ">int</span> a = <span class="num">10</span>;
+
+    <span class="kw">public</span> <span class="cls">List</span>&lt;<span class="typ">int</span>&gt; nums = <span class="kw">new</span>() { <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span> };
+
+    <span class="kw">public</span> <span class="cls">MyService</span> _svc = <span class="kw">new</span> <span class="cls">MyService</span>();
+
+    <span class="cmt">// ❌ Chiamata a metodo NON è un inizializzatore valido:</span>
+    <span class="cmt">// Console.WriteLine(a);  // errore di compilazione</span>
+}</pre>
+    <div class="info-box">
+      <div class="info-title">Perché funzionano gli inizializzatori?</div>
+      <div class="rule-text">Il compilatore C# sposta automaticamente gli inizializzatori di campo nel costruttore. Quindi <code>public int a = 10</code> è zucchero sintattico per <code>this.a = 10</code> dentro il costruttore implicito.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Errori tipici -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Errori Tipici da Neofiti</span><span class="card-tag tag-rule">errori</span></div>
+  <div class="card-body">
+    <pre><span class="kw">public class</span> <span class="cls">MyService</span>
+{
+    <span class="cmt">// ❌ SBAGLIATO — chiamata a metodo fuori da un blocco di esecuzione</span>
+    <span class="fn">ValidateConfig</span>();   <span class="cmt">// errore CS0106</span>
+
+    <span class="cmt">// ❌ SBAGLIATO — assegnazione semplice (non inizializzatore)</span>
+    x = GetDefaultX();  <span class="cmt">// errore</span>
+
+    <span class="cmt">// ✅ CORRETTO — metti la logica nel costruttore</span>
+    <span class="kw">public</span> <span class="cls">MyService</span>()
+    {
+        <span class="fn">ValidateConfig</span>();
+        x = <span class="fn">GetDefaultX</span>();
+    }
+}</pre>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

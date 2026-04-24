@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deploy VPS — Procedura Completa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-red">🚀</div>
+  <div>
+    <div class="section-title">Deploy VPS — Procedura Completa</div>
+    <div class="section-desc">PM Software &amp; Automation — Docker Compose + Nginx + SSL + SQL Server</div>
+  </div>
+</div>
+
+<!-- Infrastruttura -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Panoramica Infrastruttura</span><span class="card-tag tag-pattern">architettura</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Componente</th><th>Dettaglio</th></tr>
+      <tr><td>Compose file</td><td>docker-compose-ssl.yml</td></tr>
+      <tr><td>Reverse proxy</td><td>Nginx (container nginx-proxy)</td></tr>
+      <tr><td>SSL</td><td>Certbot + Let's Encrypt (rinnovo automatico)</td></tr>
+      <tr><td>Database</td><td>SQL Server 2022 (container sqlserver, condiviso)</td></tr>
+      <tr><td>Rete Docker</td><td>gadis-network (external)</td></tr>
+      <tr><td>Config Nginx</td><td>/home/deployuser/nginx/conf.d/</td></tr>
+      <tr><td>Backup DB</td><td>/home/deployuser/backups/</td></tr>
+      <tr><td>File app</td><td>/srv/[nome-app]/images, /srv/[nome-app]/documents</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Step 1 -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Step 1 — Cartelle per i Volumi</span><span class="card-tag tag-service">host</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Creare cartelle sul VPS</span>
+sudo mkdir -p /srv/[nome-app]/images
+sudo mkdir -p /srv/[nome-app]/documents
+
+<span class="cmt"># Assegnare permessi PRIMA di qualsiasi trasferimento</span>
+sudo chown -R deployuser:deployuser /srv/[nome-app]
+
+<span class="cmt"># Verificare</span>
+ls -la /srv/[nome-app]/</pre>
+    <div class="rule-box">
+      <div class="rule-title">⚠ Permessi prima del trasferimento</div>
+      <div class="rule-text">Eseguire sempre il <code>chown</code> PRIMA di trasferire file via WinSCP. Altrimenti si ottiene "Permission denied".</div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 2 -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Step 2 — Blocco Servizio in docker-compose-ssl.yml</span><span class="card-tag tag-state">compose</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Aprire il file</span>
+nano /home/deployuser/docker-compose-ssl.yml
+
+<span class="cmt"># Aggiungere in fondo alla sezione services:</span>
+<span class="str">  [nome-servizio]:</span>
+<span class="str">    image: pm83dev/[nome-immagine]:latest</span>
+<span class="str">    container_name: [nome-servizio]</span>
+<span class="str">    restart: unless-stopped</span>
+<span class="str">    environment:</span>
+<span class="str">      - DOTNET_ENVIRONMENT=Production</span>
+<span class="str">      - ASPNETCORE_URLS=http://+:5000</span>
+<span class="str">      - ConnectionStrings__Fashion=Server=sqlserver,1433;Database=[NomeDB];UserId=sa;Password=1.Password!;TrustServerCertificate=true;</span>
+<span class="str">    depends_on:</span>
+<span class="str">      - sqlserver</span>
+<span class="str">    networks:</span>
+<span class="str">      - gadis-network</span>
+<span class="str">    expose:</span>
+<span class="str">      - "5000"</span>
+<span class="str">    volumes:</span>
+<span class="str">      - /srv/[nome-app]/images:/data/images</span>
+<span class="str">      - /srv/[nome-app]/documents:/data/documents</span>
+
+<span class="cmt"># Verificare sintassi YAML</span>
+docker compose -f docker-compose-ssl.yml config</pre>
+    <div class="rule-box">
+      <div class="rule-title">⚠ Doppio underscore ConnectionStrings</div>
+      <div class="rule-text"><code>ConnectionStrings__Fashion</code> (doppio underscore) sovrascrive automaticamente <code>ConnectionStrings:Fashion</code> nell'appsettings.json. I <code>__</code> corrispondono ai <code>:</code> nella gerarchia JSON di .NET.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 3 -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Step 3 — Restore Database SQL Server</span><span class="card-tag tag-action">database</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Trasferire backup con WinSCP in: /home/deployuser/backups/
+# Per file grandi (>2GB) usare rsync da WSL:</span>
+rsync -av --progress /mnt/c/percorso/file.back deployuser@IP:/home/deployuser/backups/
+
+<span class="cmt"># Verificare i nomi logici del backup</span>
+docker exec -it sqlserver /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P <span class="str">"1.Password!"</span> -C \
+  -Q <span class="str">"RESTORE FILELISTONLY FROM DISK = '/backups/[file.back]'"</span>
+
+<span class="cmt"># Eseguire il restore</span>
+docker exec -it sqlserver /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P <span class="str">"1.Password!"</span> -C \
+  -Q <span class="str">"RESTORE DATABASE [NomeDB] FROM DISK = '/backups/[file.back]'
+  WITH MOVE '[LogicalName_dati]' TO '/var/opt/mssql/data/[NomeDB].mdf',
+  MOVE '[LogicalName_log]' TO '/var/opt/mssql/data/[NomeDB]_log.ldf', REPLACE"</span>
+
+<span class="cmt"># Verificare che il database sia presente</span>
+docker exec -it sqlserver /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P <span class="str">"1.Password!"</span> -C \
+  -Q <span class="str">"SELECT name FROM sys.databases"</span></pre>
+    <div class="rule-box">
+      <div class="rule-title">⚠ WITH MOVE obbligatorio</div>
+      <div class="rule-text">Il backup ricorda i percorsi originali Windows (<code>C:\Program Files\...</code>) che non esistono nel container Linux. <code>WITH MOVE</code> reindirizza i file ai percorsi corretti.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 4-6 Nginx + SSL -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Step 4-6 — Nginx Config + SSL Certbot</span><span class="card-tag tag-component">nginx</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Step 4 — Crea config HTTP (solo per la verifica Certbot)</span>
+nano /home/deployuser/nginx/conf.d/[nome-app].conf</pre>
+    <pre><span class="kw">server</span> {
+    listen 80;
+    server_name [sottodominio.dominio.com];
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}</pre>
+    <pre><span class="cmt"># Ricarica Nginx</span>
+docker exec nginx-proxy nginx -s reload
+
+<span class="cmt"># Step 5 — Genera certificato SSL</span>
+docker exec certbot certbot certonly \
+  --webroot -w /var/www/certbot \
+  -d [sottodominio.dominio.com] \
+  --email [email] --agree-tos --no-eff-email</pre>
+    <pre><span class="cmt"># Step 6 — Config HTTPS completa</span>
+<span class="kw">server</span> {
+    listen 443 ssl;
+    server_name [sottodominio.dominio.com];
+    ssl_certificate /etc/letsencrypt/live/[sottodominio]/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/[sottodominio]/privkey.pem;
+    proxy_http_version 1.1;
+    proxy_set_header Connection <span class="str">""</span>;
+    location / {
+        proxy_pass http://[nome-servizio]:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}</pre>
+    <div class="info-box">
+      <div class="info-title">proxy_pass — usa il nome servizio Docker</div>
+      <div class="rule-text">In <code>proxy_pass</code> usa il nome del servizio Docker (chiave nel compose), non il <code>container_name</code>. Nginx risolve i nomi tramite la rete Docker interna.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 8 -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Step 8 — Pull Immagine e Avvio Container</span><span class="card-tag tag-service">docker</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Pull dell'immagine</span>
+docker compose -f docker-compose-ssl.yml pull [nome-servizio]
+
+<span class="cmt"># Avvio del container (senza toccare gli altri)</span>
+docker compose -f docker-compose-ssl.yml up -d [nome-servizio]
+
+<span class="cmt"># Riavvio forzato</span>
+docker compose -f docker-compose-ssl.yml up -d --force-recreate [nome-servizio]
+
+<span class="cmt"># Ricaricare Nginx dopo l'avvio</span>
+docker exec nginx-proxy nginx -s reload
+
+<span class="cmt"># Verificare log</span>
+docker logs [nome-servizio] --tail 50</pre>
+  </div>
+</div>
+
+<!-- Step 9 -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Step 9 — Verifiche Finali</span><span class="card-tag tag-rule">check</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Container in esecuzione?</span>
+docker ps | grep [nome-servizio]
+
+<span class="cmt"># Endpoint API raggiungibile?</span>
+curl https://[sottodominio.dominio.com]/api/v1/[endpoint]
+
+<span class="cmt"># Volumi montati correttamente?</span>
+docker exec -it [nome-servizio] ls -la /data/images
+docker exec -it [nome-servizio] ls -la /data/documents
+
+<span class="cmt"># Variabili d'ambiente presenti?</span>
+docker exec [nome-servizio] printenv | grep ConnectionStrings</pre>
+  </div>
+</div>
+
+<!-- Problemi noti -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Problemi Noti e Soluzioni</span><span class="card-tag tag-component">debug</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Problema</th><th>Soluzione</th></tr>
+      <tr><td>WinSCP: Permission denied su /srv/</td><td><code>sudo chown -R deployuser:deployuser /srv/[nome-app]</code></td></tr>
+      <tr><td>scp interrotto a metà (file grande)</td><td>Usare <code>rsync</code> da WSL con <code>--progress</code> (riprende dall'interruzione)</td></tr>
+      <tr><td>RESTORE: file ID incorrectly formed</td><td>File di backup troncato — ritrasferire il file completo</td></tr>
+      <tr><td>Nginx: host not found in upstream</td><td>Il container non è ancora avviato — avviarlo prima di ricaricare Nginx</td></tr>
+      <tr><td>YAML: did not find expected key</td><td>Indentazione errata — usare sempre 2 spazi, mai tab</td></tr>
+      <tr><td>App avviata ma dati non visibili</td><td>Verificare che appsettings.json di produzione punti al DB corretto</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Filesystem container -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Filesystem Container .NET + Angular</span><span class="card-tag tag-modal">struttura</span></div>
+  <div class="card-body">
+    <pre>/
+├── app/                    ← WORKDIR del Dockerfile
+│   ├── [App].Server.dll    ← binario .NET
+│   ├── appsettings.json    ← configurazione
+│   └── wwwroot/            ← Angular buildato
+│        └── index.html
+└── data/                   ← volumi montati dall'host
+    ├── images/             ← monta /srv/[nome-app]/images
+    └── documents/          ← monta /srv/[nome-app]/documents
+
+<span class="cmt"># Entrare nel container per debug</span>
+docker exec -it [nome-container] /bin/sh</pre>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

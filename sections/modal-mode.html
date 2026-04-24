@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>modal-mode</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-pink">🎛️</div>
+        <div>
+          <div class="section-title">Modal — add/edit Mode</div>
+          <div class="section-desc">Come discriminare il comportamento del modal in base al contesto di apertura</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">data.ts — selectedItem + modalMode</span>
+          <span class="card-tag tag-component">component</span>
+        </div>
+        <pre>
+<span class="kw">export class</span> <span class="cls">Data</span> {
+  <span class="prop">showModal</span>  = <span class="kw">false</span>;
+  <span class="prop">selectedItem</span>: <span class="cls">DataItem</span> | <span class="kw">null</span> = <span class="kw">null</span>;
+  <span class="prop">modalMode</span>: <span class="str">'add'</span> | <span class="str">'edit'</span> = <span class="str">'add'</span>;
+
+  <span class="fn">addItem</span>() {
+    <span class="kw">this</span>.<span class="prop">selectedItem</span> = <span class="kw">null</span>;         <span class="cmt">// modal vuoto</span>
+    <span class="kw">this</span>.<span class="prop">modalMode</span>   = <span class="str">'add'</span>;
+    <span class="kw">this</span>.<span class="prop">showModal</span>   = <span class="kw">true</span>;
+  }
+
+  <span class="fn">editItem</span>(item: <span class="cls">DataItem</span>) {
+    <span class="kw">this</span>.<span class="prop">selectedItem</span> = item;           <span class="cmt">// item da modificare</span>
+    <span class="kw">this</span>.<span class="prop">modalMode</span>   = <span class="str">'edit'</span>;
+    <span class="kw">this</span>.<span class="prop">showModal</span>   = <span class="kw">true</span>;
+  }
+
+  <span class="fn">saveItem</span>() {
+    <span class="kw">if</span> (<span class="kw">this</span>.<span class="prop">modalMode</span> === <span class="str">'add'</span>) {
+      <span class="cmt">// dispatch azione di creazione</span>
+    } <span class="kw">else</span> {
+      <span class="cmt">// dispatch azione di aggiornamento</span>
+    }
+    <span class="kw">this</span>.<span class="prop">showModal</span> = <span class="kw">false</span>;
+  }
+}</pre>
+      </div>
+
+      <div class="flow">
+        <div class="flow-row">
+          <span class="flow-label">click Edit(item)</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-node fn-red">editItem(item)</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-label">selectedItem = item, modalMode = 'edit', showModal = true</span>
+        </div>
+        <div class="flow-row" style="margin-left: 20px;margin-top:6px">
+          <span class="flow-arrow">↓</span>
+        </div>
+        <div class="flow-row">
+          <span class="flow-node fn-cyan">modal</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-label">mostra selectedItem nei campi</span>
+        </div>
+        <div class="flow-row" style="margin-left: 20px;margin-top:6px">
+          <span class="flow-arrow">↓</span>
+        </div>
+        <div class="flow-row">
+          <span class="flow-label">utente clicca Salva</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-node fn-cyan">confirm()</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-node fn-red">saveItem()</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-label">if modalMode === 'edit' → dispatch update</span>
+        </div>
+      </div>
+
+      <div class="rule-box">
+        <div class="rule-title">📌 Principio</div>
+        <div class="rule-text">Il modal <strong>emette</strong> (confirmed). Il component parent (<code>data.ts</code>) <strong>decide</strong> cosa fare. Il modal rimane generico e riutilizzabile.</div>
+      </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SDS Analyzer — Guida Architetturale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-purple">🧪</div>
+  <div>
+    <div class="section-title">SDS Analyzer — Architettura e Sviluppo</div>
+    <div class="section-desc">SaaS multi-tenant • .NET + Angular • PostgreSQL • LLM Integration (LM Studio / Claude API)</div>
+  </div>
+</div>
+
+<!-- Stack -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Stack Tecnologico</span><span class="card-tag tag-pattern">stack</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Layer</th><th>Dev (LM Studio)</th><th>Prod (VPS Contabo)</th></tr>
+      <tr><td>Frontend</td><td>Angular + Bootstrap</td><td>Angular (build statico da Nginx)</td></tr>
+      <tr><td>Backend</td><td>.NET Web API + Worker</td><td>.NET Web API + Worker</td></tr>
+      <tr><td>Database</td><td>PostgreSQL (Docker locale)</td><td>PostgreSQL (Docker su VPS)</td></tr>
+      <tr><td>LLM</td><td>LM Studio localhost:1234</td><td>Claude API (Anthropic)</td></tr>
+      <tr><td>PDF</td><td>pdfplumber (Python sidecar)</td><td>pdfplumber (Python sidecar)</td></tr>
+      <tr><td>Auth</td><td colspan="2">JWT + Refresh Token Rotation</td></tr>
+      <tr><td>Infra</td><td>Docker Compose locale</td><td>Docker Compose + Nginx + SSL</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Flusso asincrono -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Flusso Dati — Pipeline Asincrona</span><span class="card-tag tag-action">pipeline</span></div>
+  <div class="card-body">
+    <div class="flow">
+      <div class="flow-row"><span class="flow-node fn-red">Upload</span><span class="flow-arrow">→</span><span class="flow-label">API Controller — salva PDF, crea record status=pending, accoda job</span></div>
+      <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+      <div class="flow-row"><span class="flow-node fn-orange">Queue</span><span class="flow-arrow">→</span><span class="flow-label">InMemoryQueue — Channel&lt;Guid&gt; thread-safe</span></div>
+      <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+      <div class="flow-row"><span class="flow-node fn-purple">Worker</span><span class="flow-arrow">→</span><span class="flow-label">BackgroundService — estrae testo PDF, chiama LLM, salva JSON</span></div>
+      <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+      <div class="flow-row"><span class="flow-node fn-blue">Polling</span><span class="flow-arrow">→</span><span class="flow-label">Angular monitora status ogni 3s fino a done/error</span></div>
+      <div class="flow-row" style="margin-left:20px"><span class="flow-arrow">↓</span></div>
+      <div class="flow-row"><span class="flow-node fn-green">Export</span><span class="flow-arrow">→</span><span class="flow-label">API + openpyxl genera Excel on-demand</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Schema DB -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Schema Database PostgreSQL</span><span class="card-tag tag-state">database</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Tabella</th><th>Colonne chiave</th><th>Note</th></tr>
+      <tr><td>tenants</td><td>id, nome, piano, created_at</td><td>Un record per cliente SaaS</td></tr>
+      <tr><td>users</td><td>id, tenant_id, email, password_hash, ruolo</td><td>Admin o user per tenant</td></tr>
+      <tr><td>sds_documents</td><td>id, tenant_id, filename, file_hash, status, processed_at</td><td>Status: pending/processing/done/error</td></tr>
+      <tr><td>sds_extracted_data</td><td>id, document_id, data JSONB, llm_model, prompt_version</td><td>JSONB flessibile per campi SDS</td></tr>
+      <tr><td>sds_exports</td><td>id, tenant_id, file_path, filtri_applicati JSONB</td><td>Storico Excel generati</td></tr>
+      <tr><td>processing_logs</td><td>id, document_id, step, status, messaggio, duration_ms</td><td>OCR / LLM / export</td></tr>
+    </table>
+    <div class="info-box">
+      <div class="info-title">Perché JSONB per i dati estratti</div>
+      <div class="rule-text">I campi SDS da estrarre non sono ancora definiti dal cliente. Con JSONB puoi aggiungere o modificare campi senza ALTER TABLE. Quando i requisiti sono stabili, aggiungi colonne tipizzate.</div>
+    </div>
+  </div>
+</div>
+
+<!-- LLM intercambiabile -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Pattern LLM Intercambiabile</span><span class="card-tag tag-service">pattern</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// ILlmService.cs — interfaccia comune</span>
+<span class="kw">public interface</span> <span class="cls">ILlmService</span> {
+  <span class="cls">Task</span>&lt;<span class="typ">string</span>&gt; <span class="fn">ExtractSdsDataAsync</span>(<span class="typ">string</span> pdfText, <span class="cls">CancellationToken</span> ct);
+}
+
+<span class="cmt">// appsettings.json</span>
+<span class="str">"LlmProvider"</span>: <span class="str">"lmstudio"</span>,   <span class="cmt">// oppure "anthropic"</span>
+<span class="str">"LmStudio"</span>: { <span class="str">"BaseUrl"</span>: <span class="str">"http://localhost:1234/v1"</span>, <span class="str">"Model"</span>: <span class="str">"qwen2.5-14b-instruct"</span> },
+<span class="str">"Anthropic"</span>: { <span class="str">"ApiKey"</span>: <span class="str">"sk-ant-..."</span>, <span class="str">"Model"</span>: <span class="str">"claude-sonnet-4-6"</span> }
+
+<span class="cmt">// Program.cs — registrazione condizionale</span>
+<span class="kw">if</span> (config[<span class="str">"LlmProvider"</span>] == <span class="str">"anthropic"</span>)
+  builder.Services.<span class="fn">AddScoped</span>&lt;<span class="cls">ILlmService</span>, <span class="cls">AnthropicLlmService</span>&gt;();
+<span class="kw">else</span>
+  builder.Services.<span class="fn">AddScoped</span>&lt;<span class="cls">ILlmService</span>, <span class="cls">LmStudioLlmService</span>&gt;();</pre>
+  </div>
+</div>
+
+<!-- Struttura .NET -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Struttura Soluzione .NET</span><span class="card-tag tag-state">architettura</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Progetto</th><th>Responsabilità</th></tr>
+      <tr><td>SdsAnalyzer.API</td><td>Controller REST, middleware, configurazione JWT, Swagger</td></tr>
+      <tr><td>SdsAnalyzer.Application</td><td>Use cases, servizi applicativi, interfacce</td></tr>
+      <tr><td>SdsAnalyzer.Domain</td><td>Entità di dominio, value objects</td></tr>
+      <tr><td>SdsAnalyzer.Infrastructure</td><td>EF Core + PostgreSQL, LLM client, FileStorage, PDF parser</td></tr>
+      <tr><td>SdsAnalyzer.Worker</td><td>BackgroundService, InMemoryQueue (Channel&lt;Guid&gt;)</td></tr>
+    </table>
+    <pre><span class="cmt"># Scaffold da WSL</span>
+dotnet new sln -n SdsAnalyzer
+dotnet new webapi -n SdsAnalyzer.API
+dotnet new classlib -n SdsAnalyzer.Application
+dotnet new classlib -n SdsAnalyzer.Domain
+dotnet new classlib -n SdsAnalyzer.Infrastructure
+dotnet new worker -n SdsAnalyzer.Worker</pre>
+  </div>
+</div>
+
+<!-- Route Angular -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Struttura Frontend Angular</span><span class="card-tag tag-component">routing</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Route</th><th>Componente</th><th>Accesso</th></tr>
+      <tr><td>/login</td><td>LoginComponent</td><td>Pubblico</td></tr>
+      <tr><td>/dashboard</td><td>DashboardComponent</td><td>Autenticato</td></tr>
+      <tr><td>/upload</td><td>UploadComponent</td><td>Autenticato</td></tr>
+      <tr><td>/documents</td><td>DocumentListComponent</td><td>Autenticato</td></tr>
+      <tr><td>/documents/:id</td><td>DocumentDetailComponent</td><td>Autenticato</td></tr>
+      <tr><td>/export</td><td>ExportComponent</td><td>Autenticato</td></tr>
+      <tr><td>/admin</td><td>AdminComponent</td><td>Solo ruolo Admin</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Procedura step-by-step -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Procedura di Sviluppo Step-by-Step</span><span class="card-tag tag-rule">roadmap</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Step</th><th>Cosa fare</th></tr>
+      <tr><td>1 — LM Studio</td><td>Scarica da lmstudio.ai, carica Qwen2.5 14B Q4, avvia server (porta 1234). Verifica: <code>curl http://localhost:1234/v1/models</code></td></tr>
+      <tr><td>2 — Scaffold .NET</td><td>Crea sln con 5 progetti (API, Application, Domain, Infrastructure, Worker)</td></tr>
+      <tr><td>3 — PostgreSQL</td><td><code>docker run -d --name sds-postgres -e POSTGRES_PASSWORD=devpassword -p 5432:5432 postgres:16-alpine</code> + EF Core + DbContext</td></tr>
+      <tr><td>4 — JWT Auth</td><td>JWT + Refresh Token Rotation. TenantId nei claims. Middleware che inietta TenantId nel scope.</td></tr>
+      <tr><td>5 — Pipeline PDF→LLM</td><td>Python sidecar con pdfplumber (POST /extract-text). ILlmService per LM Studio. Salva JSON in JSONB.</td></tr>
+      <tr><td>6 — BackgroundWorker</td><td>Channel&lt;Guid&gt; + BackgroundService. Recovery al riavvio: riaccoda status=pending/processing.</td></tr>
+      <tr><td>7 — Angular</td><td>ng new, ng-bootstrap, AuthGuard, TenantInterceptor (JWT header), polling ogni 3s.</td></tr>
+      <tr><td>8 — Export Excel</td><td>openpyxl nel sidecar Python. Colonne dinamiche da JSONB.</td></tr>
+      <tr><td>9 — Docker Compose</td><td>Test end-to-end in container. Verifica recovery worker dopo restart.</td></tr>
+      <tr><td>10 — Deploy VPS</td><td>Subdomain, Nginx, Certbot SSL. Switch <code>lmstudio</code> → <code>anthropic</code> in appsettings.Production.json</td></tr>
+    </table>
+    <div class="info-box">
+      <div class="info-title">💡 Consiglio pratico</div>
+      <div class="rule-text">Inizia con Step 1-5 e testa la pipeline su 2-3 SDS reali prima di costruire il resto. Il <strong>prompt LLM è la parte più critica</strong>. Con LM Studio + Qwen2.5 14B aspettati 30-60 secondi per SDS: normale per dev/test.</div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

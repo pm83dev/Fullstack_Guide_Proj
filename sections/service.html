@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>service</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+        <div class="section-icon icon-green">⚙️</div>
+        <div>
+          <div class="section-title">Service</div>
+          <div class="section-desc">Responsabile delle chiamate HTTP. Ritorna sempre un Observable.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">product.service.ts</span>
+          <span class="card-tag tag-service">service</span>
+        </div>
+        <pre>
+<span class="cmt">// product.service.ts</span>
+<span class="kw">import</span> { Injectable } <span class="kw">from</span> <span class="str">'@angular/core'</span>;
+<span class="kw">import</span> { HttpClient } <span class="kw">from</span> <span class="str">'@angular/common/http'</span>;
+<span class="kw">import</span> { Observable } <span class="kw">from</span> <span class="str">'rxjs'</span>;
+<span class="kw">import</span> { IProductModel } <span class="kw">from</span> <span class="str">'../interface/product.interface'</span>;
+
+<span class="dec">@Injectable</span>({ providedIn: <span class="str">'root'</span> })
+<span class="kw">export class</span> <span class="cls">ProductService</span> {
+  <span class="kw">private</span> <span class="prop">baseUrl</span> = <span class="str">'/api/products'</span>;
+
+  <span class="fn">constructor</span>(<span class="kw">private</span> <span class="prop">http</span>: <span class="cls">HttpClient</span>) {}
+
+  <span class="fn">getProducts</span>(params?: any): <span class="cls">Observable</span>&lt;<span class="cls">IProductModel</span>&gt; {
+    <span class="kw">return</span> <span class="kw">this</span>.<span class="prop">http</span>.<span class="fn">get</span>&lt;<span class="cls">IProductModel</span>&gt;(<span class="kw">this</span>.<span class="prop">baseUrl</span>, { params });
+  }
+}</pre>
+      </div>
+
+      <div class="rule-box">
+        <div class="rule-title">📌 Regola</div>
+        <div class="rule-text">Il Service non conosce NGXS. Non dispatcha nulla. Non tocca lo store. Restituisce solo un Observable.</div>
+      </div>
+</div>
+</body>
+</html>

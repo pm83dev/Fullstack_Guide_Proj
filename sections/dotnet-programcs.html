@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dotnet-programcs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+  <div class="section-icon icon-blue">⚙️</div>
+  <div>
+    <div class="section-title">Program.cs — ASP.NET Core</div>
+    <div class="section-desc">Configurazione completa: servizi, middleware pipeline, appsettings.json</div>
+  </div>
+</div>
+
+<div class="rule-box">
+  <div class="rule-title">⚠️ Ordine middleware critico</div>
+  <div class="rule-text">La sequenza corretta è: <code>UseHttpsRedirection → UseCors → UseAuthentication → UseAuthorization → MapControllers</code>. Invertire <code>UseAuthentication</code> e <code>UseAuthorization</code> causa errori 401 inspiegabili.</div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Program.cs — Scheletro completo</span><span class="card-tag tag-pattern">C#</span></div>
+  <pre><span class="kw">var</span> builder = WebApplication.<span class="fn">CreateBuilder</span>(args);
+
+<span class="cmt">// ─── Servizi ──────────────────────────────────────────</span>
+builder.Services.<span class="fn">AddControllers</span>();
+builder.Services.<span class="fn">AddEndpointsApiExplorer</span>();
+builder.Services.<span class="fn">AddSwaggerGen</span>();
+
+<span class="cmt">// DbContext</span>
+builder.Services.<span class="fn">AddDbContext</span>&lt;<span class="cls">AppDbContext</span>&gt;(opt =&gt;
+    opt.<span class="fn">UseSqlServer</span>(builder.Configuration.<span class="fn">GetConnectionString</span>(<span class="str">"Default"</span>)));
+
+<span class="cmt">// CORS (solo in sviluppo)</span>
+builder.Services.<span class="fn">AddCors</span>(opt =&gt; opt.<span class="fn">AddPolicy</span>(<span class="str">"Dev"</span>, p =&gt;
+    p.<span class="fn">WithOrigins</span>(<span class="str">"http://localhost:4200"</span>).<span class="fn">AllowAnyMethod</span>().<span class="fn">AllowAnyHeader</span>()));
+
+<span class="cmt">// JWT</span>
+builder.Services.<span class="fn">AddAuthentication</span>(JwtBearerDefaults.AuthenticationScheme)
+    .<span class="fn">AddJwtBearer</span>(opt =&gt; {
+        opt.TokenValidationParameters = <span class="kw">new</span> <span class="cls">TokenValidationParameters</span> {
+            ValidateIssuerSigningKey = <span class="kw">true</span>,
+            IssuerSigningKey = <span class="kw">new</span> <span class="cls">SymmetricSecurityKey</span>(
+                Encoding.UTF8.<span class="fn">GetBytes</span>(builder.Configuration[<span class="str">"Jwt:Key"</span>]!)),
+            ValidateIssuer = <span class="kw">false</span>,
+            ValidateAudience = <span class="kw">false</span>
+        };
+    });
+
+<span class="cmt">// DI custom</span>
+builder.Services.<span class="fn">AddScoped</span>&lt;<span class="cls">IProductRepository</span>, <span class="cls">ProductRepository</span>&gt;();
+
+<span class="kw">var</span> app = builder.<span class="fn">Build</span>();
+
+<span class="cmt">// ─── Pipeline ─────────────────────────────────────────</span>
+<span class="kw">if</span> (app.Environment.<span class="fn">IsDevelopment</span>()) {
+    app.<span class="fn">UseSwagger</span>(); app.<span class="fn">UseSwaggerUI</span>();
+}
+
+app.<span class="fn">UseCors</span>(<span class="str">"Dev"</span>);          <span class="cmt">// ← PRIMA di MapControllers</span>
+app.<span class="fn">UseAuthentication</span>();     <span class="cmt">// ← PRIMA di UseAuthorization</span>
+app.<span class="fn">UseAuthorization</span>();
+app.<span class="fn">MapControllers</span>();
+app.<span class="fn">Run</span>();</pre>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Flusso builder / app</span></div>
+  <div class="flow">
+    <div class="flow-row"><span class="flow-node fn-blue">builder.Services.Add*()</span><span class="flow-arrow">→</span><span class="flow-label">Registra servizi nella DI</span></div>
+    <div class="flow-row"><span class="flow-node fn-orange">builder.Build()</span><span class="flow-arrow">→</span><span class="flow-label">Punto di separazione — dopo: niente più Add*()</span></div>
+    <div class="flow-row"><span class="flow-node fn-purple">app.Use*()</span><span class="flow-arrow">→</span><span class="flow-label">Configura pipeline middleware (ordine obbligatorio)</span></div>
+    <div class="flow-row"><span class="flow-node fn-green">app.Map*()</span><span class="flow-arrow">→</span><span class="flow-label">Mappa endpoint (controllers, minimal API)</span></div>
+    <div class="flow-row"><span class="flow-node fn-red">app.Run()</span><span class="flow-arrow">→</span><span class="flow-label">Avvia il server HTTP</span></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">appsettings.json — sezioni comuni</span><span class="card-tag tag-action">JSON</span></div>
+  <pre>{
+  <span class="prop">"ConnectionStrings"</span>: {
+    <span class="prop">"Default"</span>: <span class="str">"Server=.;Database=MyDb;Trusted_Connection=True;TrustServerCertificate=True"</span>
+  },
+  <span class="prop">"Jwt"</span>: {
+    <span class="prop">"Key"</span>: <span class="str">"una-chiave-segreta-lunga-almeno-32-caratteri"</span>
+  },
+  <span class="prop">"Logging"</span>: { <span class="prop">"LogLevel"</span>: { <span class="prop">"Default"</span>: <span class="str">"Information"</span> } },
+  <span class="prop">"AllowedHosts"</span>: <span class="str">"*"</span>
+}</pre>
+  <div class="card-body">
+    <p><strong>⚠️ Non committare mai segreti reali</strong> (chiavi JWT, password DB) in <code>appsettings.json</code>. In sviluppo usa <code>dotnet user-secrets</code>, in produzione usa variabili d'ambiente o Azure Key Vault.</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Pacchetti NuGet essenziali</span></div>
+  <pre><span class="cmt"># Entity Framework Core (SQL Server)</span>
+dotnet add MyProject.Infrastructure package Microsoft.EntityFrameworkCore.SqlServer
+dotnet add MyProject.Infrastructure package Microsoft.EntityFrameworkCore.Tools
+
+<span class="cmt"># JWT Auth</span>
+dotnet add MyProject.Api package Microsoft.AspNetCore.Authentication.JwtBearer
+
+<span class="cmt"># Swagger</span>
+dotnet add MyProject.Api package Swashbuckle.AspNetCore
+
+<span class="cmt"># AutoMapper (opzionale)</span>
+dotnet add MyProject.Api package AutoMapper.Extensions.Microsoft.DependencyInjection</pre>
+  <div class="card-body">
+    <p>⚠️ <code>EntityFrameworkCore.Tools</code> va su <strong>Infrastructure</strong>, non su Api. Se installato nel posto sbagliato, <code>dotnet ef</code> non trova il DbContext.</p>
+  </div>
+</div>
+</div>
+</body>
+</html>

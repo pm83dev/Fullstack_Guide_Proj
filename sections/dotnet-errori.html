@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dotnet-errori</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+<div class="section-header">
+  <div class="section-icon icon-red">🔥</div>
+  <div>
+    <div class="section-title">Errori Comuni — da Esperienze Reali</div>
+    <div class="section-desc">Problemi incontrati su progetti reali: Angular 17+/21, NGXS payload, .NET middleware, CORS</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Angular 21 — SSR abilitato di default</span><span class="card-tag tag-component">Angular 21</span></div>
+  <div class="card-body"><p>Angular 21 genera i nuovi progetti con SSR attivo. NGXS non è compatibile con SSR e causa errori Zone.js nel contesto server.</p></div>
+  <pre><span class="cmt">// angular.json — sezione options CORRETTA (senza SSR)</span>
+<span class="str">"options"</span>: {
+  <span class="str">"browser"</span>: <span class="str">"src/main.ts"</span>,
+  <span class="str">"polyfills"</span>: [<span class="str">"zone.js"</span>],
+  <span class="str">"tsConfig"</span>: <span class="str">"tsconfig.app.json"</span>,
+  <span class="str">"inlineStyleLanguage"</span>: <span class="str">"scss"</span>,
+  <span class="str">"assets"</span>: [{ <span class="str">"glob"</span>: <span class="str">"**/*"</span>, <span class="str">"input"</span>: <span class="str">"public"</span> }],
+  <span class="str">"styles"</span>: [<span class="str">"src/styles.scss"</span>]
+}
+<span class="cmt">// Rimuovere: "server", "outputMode", "ssr"</span></pre>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Angular 21 — Zone.js non installato</span><span class="card-tag tag-component">Angular 21</span></div>
+  <div class="card-body"><p>Angular 21 è zoneless di default. NGXS richiede ancora zone.js per il change detection.</p></div>
+  <pre>npm install zone.js
+
+<span class="cmt">// main.ts — importare PRIMA di tutto il resto</span>
+<span class="kw">import</span> <span class="str">'zone.js'</span>;
+<span class="kw">import</span> { bootstrapApplication } <span class="kw">from</span> <span class="str">'@angular/platform-browser'</span>;</pre>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Angular 17+ — Naming convention cambiata</span><span class="card-tag tag-component">Angular 17+</span></div>
+  <div class="card-body"><p>Il componente root non si chiama più <code>AppComponent</code> ma <code>App</code>. Gli import in <code>main.ts</code> devono usare il nuovo nome.</p></div>
+  <pre><span class="cmt">// ❌ SBAGLIATO (Angular &lt; 17)</span>
+<span class="kw">import</span> { <span class="cls">AppComponent</span> } <span class="kw">from</span> <span class="str">'./app/app.component'</span>;
+<span class="fn">bootstrapApplication</span>(<span class="cls">AppComponent</span>, appConfig);
+
+<span class="cmt">// ✅ CORRETTO (Angular 17+)</span>
+<span class="kw">import</span> { <span class="cls">App</span> } <span class="kw">from</span> <span class="str">'./app/app'</span>;
+<span class="fn">bootstrapApplication</span>(<span class="cls">App</span>, appConfig);</pre>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">AsyncPipe nei componenti standalone</span><span class="card-tag tag-component">Angular</span></div>
+  <pre><span class="cmt">// ❌ SBAGLIATO — AsyncPipe non disponibile</span>
+<span class="dec">@Component</span>({ standalone: <span class="kw">true</span>, template: <span class="str">'{{ data$ | async }}'</span> })
+
+<span class="cmt">// ✅ CORRETTO</span>
+<span class="dec">@Component</span>({
+  standalone: <span class="kw">true</span>,
+  imports: [<span class="cls">AsyncPipe</span>],  <span class="cmt">// ← obbligatorio nei standalone</span>
+  template: <span class="str">'{{ data$ | async }}'</span>
+})</pre>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">provideHttpClient mancante (standalone)</span><span class="card-tag tag-action">NGXS</span></div>
+  <pre><span class="cmt">// app.config.ts</span>
+<span class="kw">export const</span> appConfig: <span class="cls">ApplicationConfig</span> = {
+  providers: [
+    <span class="fn">provideHttpClient</span>(),   <span class="cmt">// ← senza questo, HttpClient non funziona</span>
+    <span class="fn">provideStore</span>([...]),
+  ]
+};</pre>
+  <div class="card-body"><p>Il sintomo è un errore di injection a runtime, non a build time. Facile da perdere.</p></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">NGXS — Payload double-nesting (errore frequente)</span><span class="card-tag tag-state">NGXS</span></div>
+  <pre><span class="cmt">// ❌ SBAGLIATO — il service riceve { payload: { OrdNum: 7 } }</span>
+<span class="dec">@Action</span>(<span class="cls">GetDocumentsAction</span>)
+<span class="fn">getDocuments</span>(ctx, action: <span class="cls">GetDocumentsAction</span>) {
+  <span class="kw">return this</span>.svc.<span class="fn">getDocuments</span>({ payload: action.payload }); <span class="cmt">// ← ERRORE</span>
+}
+
+<span class="cmt">// ✅ CORRETTO — passa payload direttamente</span>
+<span class="dec">@Action</span>(<span class="cls">GetDocumentsAction</span>)
+<span class="fn">getDocuments</span>(ctx, action: <span class="cls">GetDocumentsAction</span>) {
+  <span class="kw">return this</span>.svc.<span class="fn">getDocuments</span>(action.payload); <span class="cmt">// action.payload = { OrdNum: 7 }</span>
+}</pre>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">NGXS — Aggiungere parametri extra al payload nel Service</span><span class="card-tag tag-state">NGXS</span></div>
+  <pre><span class="cmt">// ✅ CORRETTO — spread operator unisce payload e nuovi campi</span>
+<span class="fn">getDocuments</span>(payload?: Params): Observable&lt;<span class="cls">IDocumentModel</span>&gt; {
+  <span class="kw">const</span> anaCod = <span class="kw">this</span>.store.<span class="fn">selectSnapshot</span>(AccountState.user)?.id ?? <span class="acc">0</span>;
+  <span class="kw">const</span> params = { ...payload, AnaCod: anaCod };
+  <span class="cmt">// { OrdNum: 7 } + AnaCod: 93 → ?OrdNum=7&amp;AnaCod=93</span>
+  <span class="kw">return this</span>.http.<span class="fn">get</span>&lt;<span class="cls">IDocumentModel</span>&gt;(url, { params });
+}</pre>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Regola d'oro: chiavi JS = proprietà C# [FromQuery]</span><span class="card-tag tag-rule">FULL STACK</span></div>
+  <pre><span class="cmt">// Angular invia: ?OrdNum=7&amp;AnaCod=93</span>
+<span class="kw">const</span> params = { OrdNum: <span class="acc">7</span>, AnaCod: <span class="acc">93</span> };
+<span class="kw">this</span>.http.<span class="fn">get</span>(url, { params });
+
+<span class="cmt">// C# — proprietà DEVONO chiamarsi OrdNum e AnaCod</span>
+<span class="kw">public class</span> <span class="cls">FiltroDocumenti</span> {
+  <span class="kw">public int</span>? OrdNum { <span class="kw">get</span>; <span class="kw">set</span>; }
+  <span class="kw">public int</span> AnaCod { <span class="kw">get</span>; <span class="kw">set</span>; }
+}
+
+<span class="kw">public async</span> Task&lt;<span class="cls">IActionResult</span>&gt; <span class="fn">GetAllDocs</span>(<span class="dec">[FromQuery]</span> <span class="cls">FiltroDocumenti</span> filtro) {
+  <span class="cmt">// filtro.OrdNum = 7 ✓  filtro.AnaCod = 93 ✓</span>
+}</pre>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">.NET — Errori comuni</span></div>
+  <table>
+    <tr><th>Problema</th><th>Causa</th><th>Soluzione</th></tr>
+    <tr><td>CORS fallisce silenziosamente</td><td><code>UseCors()</code> dopo <code>MapControllers()</code></td><td>Spostare <code>UseCors()</code> prima di <code>MapControllers()</code></td></tr>
+    <tr><td>Tutti gli endpoint restituiscono 404</td><td><code>MapControllers()</code> mancante nel template webapi</td><td>Aggiungere <code>builder.Services.AddControllers()</code> + <code>app.MapControllers()</code></td></tr>
+    <tr><td>Errori 401 inspiegabili</td><td><code>UseAuthorization()</code> prima di <code>UseAuthentication()</code></td><td>Invertire l'ordine: prima <code>UseAuthentication()</code></td></tr>
+    <tr><td>dotnet ef non trova DbContext</td><td><code>EF Tools</code> installato su Api invece che su Infrastructure</td><td>Installare <code>EntityFrameworkCore.Tools</code> su Infrastructure</td></tr>
+    <tr><td>Swagger esposto in produzione</td><td>Swagger abilitato senza guard di ambiente</td><td>Racchiudere in <code>if (app.Environment.IsDevelopment())</code></td></tr>
+  </table>
+</div>
+</div>
+</body>
+</html>

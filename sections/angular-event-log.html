@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Angular — Event Log Component e DOM Manipulation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-cyan">📋</div>
+  <div>
+    <div class="section-title">Angular — Event Log Component e DOM Manipulation</div>
+    <div class="section-desc">Template event log con *ngFor e diff changes, flusso di manipolazione DOM in JavaScript</div>
+  </div>
+</div>
+
+<!-- Template event log -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Template — Event Log con Visualizzazione Modifiche</span><span class="card-tag tag-component">template</span></div>
+  <div class="card-body">
+    <pre>&lt;div class=<span class="str">"event-log-container"</span>&gt;
+  &lt;h2&gt;Event Log&lt;/h2&gt;
+
+  &lt;div class=<span class="str">"filters"</span>&gt;
+    &lt;input [(ngModel)]=<span class="str">"entityFilter"</span>
+           placeholder=<span class="str">"Filtra per entità"</span>
+           (input)=<span class="str">"loadEvents()"</span> /&gt;
+    &lt;button (click)=<span class="str">"loadEvents()"</span>&gt;Aggiorna&lt;/button&gt;
+  &lt;/div&gt;
+
+  &lt;div class=<span class="str">"events-list"</span> *<span class="kw">ngIf</span>=<span class="str">"events.length &gt; 0"</span>&gt;
+    &lt;div class=<span class="str">"event-item"</span>
+         *<span class="kw">ngFor</span>=<span class="str">"let event of events; trackBy: trackByEventId"</span>
+         [class.created]=<span class="str">"event.eventType === 'Created'"</span>
+         [class.updated]=<span class="str">"event.eventType === 'Updated'"</span>&gt;
+
+      &lt;div class=<span class="str">"event-header"</span>&gt;
+        &lt;span class=<span class="str">"event-type"</span>&gt;{{ event.eventType }}&lt;/span&gt;
+        &lt;span class=<span class="str">"event-date"</span>&gt;{{ formatDate(event.createdAt) }}&lt;/span&gt;
+      &lt;/div&gt;
+
+      &lt;div class=<span class="str">"event-details"</span>&gt;
+        &lt;p&gt;&lt;strong&gt;Azienda:&lt;/strong&gt; {{ event.companyName }}&lt;/p&gt;
+        &lt;p&gt;&lt;strong&gt;Modificato da:&lt;/strong&gt;
+           {{ event.userInfo?.userFullName || <span class="str">'N/A'</span> }}&lt;/p&gt;
+      &lt;/div&gt;
+
+      <span class="cmt">&lt;!-- Mostra diff solo se evento Updated e ci sono modifiche --&gt;</span>
+      &lt;div class=<span class="str">"changes"</span>
+           *<span class="kw">ngIf</span>=<span class="str">"event.eventType === 'Updated' &amp;&amp; hasChanges(event)"</span>&gt;
+        &lt;h4&gt;Modifiche:&lt;/h4&gt;
+        &lt;ul&gt;
+          <span class="cmt">&lt;!-- Modifiche azienda --&gt;</span>
+          &lt;li *<span class="kw">ngFor</span>=<span class="str">"let change of event.newDataCompany ?? []"</span>
+              class=<span class="str">"company-change"</span>&gt;
+            &lt;strong&gt;Company {{ change.fieldName }}:&lt;/strong&gt;
+            "{{ change.oldValue }}" → "{{ change.newValue }}"
+          &lt;/li&gt;
+
+          <span class="cmt">&lt;!-- Modifiche persone --&gt;</span>
+          &lt;li *<span class="kw">ngFor</span>=<span class="str">"let person of event.newDataPerson ?? []"</span>
+              class=<span class="str">"person-change"</span>&gt;
+            &lt;div *<span class="kw">ngIf</span>=<span class="str">"hasPersonChanges(person)"</span>&gt;
+              &lt;strong&gt;{{ person.name }} {{ person.surname }}&lt;/strong&gt;
+              &lt;ul&gt;
+                &lt;li *<span class="kw">ngFor</span>=<span class="str">"let change of person.newDataPerson"</span>&gt;
+                  &lt;strong&gt;Person {{ change.fieldName }}:&lt;/strong&gt;
+                  "{{ change.oldValue }}" → "{{ change.newValue }}"
+                &lt;/li&gt;
+              &lt;/ul&gt;
+            &lt;/div&gt;
+          &lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/div&gt;
+
+    &lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;div class=<span class="str">"no-events"</span> *<span class="kw">ngIf</span>=<span class="str">"events.length === 0 &amp;&amp; !loading"</span>&gt;
+    Nessun evento trovato.
+  &lt;/div&gt;
+
+  &lt;div class=<span class="str">"loading"</span> *<span class="kw">ngIf</span>=<span class="str">"loading"</span>&gt;Caricamento eventi...&lt;/div&gt;
+&lt;/div&gt;</pre>
+  </div>
+</div>
+
+<!-- Metodi componente -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Metodi del Componente</span><span class="card-tag tag-service">typescript</span></div>
+  <div class="card-body">
+    <pre><span class="kw">export class</span> <span class="cls">EventLogComponent</span> {
+  events: <span class="cls">EventLog</span>[] = [];
+  entityFilter = <span class="str">''</span>;
+  loading = <span class="kw">false</span>;
+
+  <span class="cmt">// trackBy per performance *ngFor</span>
+  <span class="fn">trackByEventId</span>(index: <span class="typ">number</span>, event: <span class="cls">EventLog</span>): <span class="typ">string</span> {
+    <span class="kw">return</span> event.id;
+  }
+
+  <span class="cmt">// Controlla se l'evento ha modifiche da mostrare</span>
+  <span class="fn">hasChanges</span>(event: <span class="cls">EventLog</span>): <span class="typ">boolean</span> {
+    <span class="kw">return</span> (event.newDataCompany?.length ?? <span class="num">0</span>) > <span class="num">0</span>
+        || (event.newDataPerson?.length ?? <span class="num">0</span>) > <span class="num">0</span>;
+  }
+
+  <span class="fn">hasPersonChanges</span>(person: <span class="cls">PersonChangeDto</span>): <span class="typ">boolean</span> {
+    <span class="kw">return</span> (person.newDataPerson?.length ?? <span class="num">0</span>) > <span class="num">0</span>;
+  }
+
+  <span class="fn">formatDate</span>(iso: <span class="typ">string</span>): <span class="typ">string</span> {
+    <span class="kw">return new</span> <span class="cls">Date</span>(iso).<span class="fn">toLocaleString</span>(<span class="str">'it-IT'</span>);
+  }
+}</pre>
+  </div>
+</div>
+
+<!-- Flusso DOM manipulation -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Flusso — Manipolazione DOM in JavaScript Vanilla</span><span class="card-tag tag-pattern">workflow</span></div>
+  <div class="card-body">
+    <div class="info-box">
+      <div class="info-title">Sequenza corretta per render dinamico</div>
+      <div class="rule-text">Seguire questo ordine evita duplicati, memory leak e race condition con gli event listener.</div>
+    </div>
+    <pre><span class="cmt">1. Definisci struttura HTML</span>
+   <span class="cmt">   - Contenitori fissi (div, table, tbody)</span>
+   <span class="cmt">   - ID/classi univoci per la selezione</span>
+        ↓
+<span class="cmt">2. Scrivi i dati (array di oggetti)</span>
+        ↓
+<span class="cmt">3. Seleziona elementi chiave</span>
+   document.<span class="fn">getElementById</span>(<span class="str">'#id'</span>)
+   document.<span class="fn">querySelector</span>(<span class="str">'.class'</span>)
+        ↓
+<span class="cmt">4. Scrivi le funzioni di render</span>
+   <span class="fn">renderCards</span>(data)
+   <span class="fn">renderTable</span>(data)
+        ↓
+<span class="cmt">5. Dentro ogni funzione:</span>
+   <span class="cmt">   - Svuota contenitore (innerHTML = '')</span>
+   <span class="cmt">   - Crea nodi o stringhe HTML</span>
+   <span class="cmt">   - Appendi al DOM</span>
+        ↓
+<span class="cmt">6. Aggancia eventi UNA SOLA VOLTA</span>
+   input.<span class="fn">addEventListener</span>(<span class="str">'input'</span>, handler)
+   button.<span class="fn">addEventListener</span>(<span class="str">'click'</span>, handler)
+        ↓
+<span class="cmt">7. Event handler:</span>
+   <span class="cmt">   - Leggi dati aggiornati (es: filtro corrente)</span>
+   <span class="cmt">   - Chiama funzione di render</span></pre>
+    <div class="rule-box">
+      <div class="rule-title">innerHTML = '' prima del render</div>
+      <div class="rule-text">Svuotare sempre il contenitore prima di aggiungere nuovi nodi. Altrimenti ogni chiamata a render() accumula elementi duplicati nel DOM.</div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

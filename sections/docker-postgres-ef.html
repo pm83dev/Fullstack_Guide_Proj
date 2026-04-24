@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docker — PostgreSQL + EF Core Migrations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-blue">🐘</div>
+  <div>
+    <div class="section-title">Docker — PostgreSQL + EF Core Migrations</div>
+    <div class="section-desc">Container PostgreSQL locale, migrazioni EF Core, AppDbContextFactory, comandi psql</div>
+  </div>
+</div>
+
+<!-- Sequenza rapida -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Sequenza Completa — Da Zero a DB Funzionante</span><span class="card-tag tag-pattern">workflow</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># 1. Avvia PostgreSQL in Docker</span>
+docker run --name dpi-postgres-test \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=DpiDb \
+  -p 5432:5432 \
+  -d postgres:15-alpine
+
+<span class="cmt"># 2. Crea la migrazione</span>
+dotnet ef migrations add InitialCreate \
+  --project dpi.infrastructure \
+  --startup-project dpi.backend \
+  --connection <span class="str">"Host=localhost;Database=DpiDb;Username=postgres;Password=postgres"</span>
+
+<span class="cmt"># 3. Applica la migrazione al database</span>
+dotnet ef database update \
+  --project dpi.infrastructure \
+  --startup-project dpi.backend \
+  --connection <span class="str">"Host=localhost;Database=DpiDb;Username=postgres;Password=postgres"</span>
+
+<span class="cmt"># 4. Verifica le tabelle create</span>
+docker exec -it dpi-postgres-test psql -U postgres -d DpiDb -c <span class="str">"\dt"</span>
+
+<span class="cmt"># 5. Avvia l'app</span>
+cd dpi.backend && dotnet run</pre>
+  </div>
+</div>
+
+<!-- Comandi Docker utili -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Comandi Docker e psql Utili</span><span class="card-tag tag-service">docker</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Verificare che il container sia in esecuzione</span>
+docker ps | findstr dpi-postgres-test
+
+<span class="cmt"># Verificare le tabelle nel DB</span>
+docker exec -it dpi-postgres-test psql -U postgres -d DpiDb -c <span class="str">"\dt"</span>
+
+<span class="cmt"># Eseguire un INSERT di test nel container</span>
+docker exec -it dpi-postgres-test psql -U postgres -d DpiDb -c \
+  <span class="str">"INSERT INTO \"Workers\" (\"Id\",\"FirstName\",\"LastName\",\"Email\",\"Department\")
+   VALUES (gen_random_uuid(),'Mario','Rossi','mario@example.com','Produzione');"</span>
+
+<span class="cmt"># Aprire una sessione psql interattiva</span>
+docker exec -it dpi-postgres-test psql -U postgres -d DpiDb
+
+<span class="cmt"># Eliminare il container (reset completo)</span>
+docker rm -f dpi-postgres-test</pre>
+    <div class="info-box">
+      <div class="info-title">Nota sui nomi colonna PostgreSQL</div>
+      <div class="rule-text">PostgreSQL è case-sensitive sui nomi delle colonne. Se EF Core genera colonne con maiuscole (es. <code>"FirstName"</code>), vanno sempre messe tra doppi apici nei comandi SQL manuali.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Program.cs -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Program.cs — Configurazione DbContext con PostgreSQL</span><span class="card-tag tag-action">program.cs</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// Program.cs</span>
+builder.Services.<span class="fn">AddDbContext</span>&lt;<span class="cls">AppDbContext</span>&gt;(options =>
+    options.<span class="fn">UseNpgsql</span>(
+        builder.Configuration.<span class="fn">GetConnectionString</span>(<span class="str">"DefaultConnection"</span>)
+    ));</pre>
+    <pre><span class="cmt">// appsettings.json</span>
+<span class="str">"ConnectionStrings"</span>: {
+  <span class="str">"DefaultConnection"</span>: <span class="str">"Host=localhost;Database=AppBaseDb;Username=postgres;Password=postgres"</span>
+}</pre>
+    <div class="rule-box">
+      <div class="rule-title">Pacchetto NuGet necessario</div>
+      <div class="rule-text"><code>dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL</code></div>
+    </div>
+  </div>
+</div>
+
+<!-- AppDbContext -->
+<div class="card">
+  <div class="card-header"><span class="card-title">AppDbContext.cs</span><span class="card-tag tag-state">dbcontext</span></div>
+  <div class="card-body">
+    <pre><span class="kw">using</span> Microsoft.EntityFrameworkCore;
+
+<span class="kw">public class</span> <span class="cls">AppDbContext</span> : <span class="cls">DbContext</span>
+{
+    <span class="kw">public</span> <span class="cls">AppDbContext</span>(<span class="cls">DbContextOptions</span>&lt;<span class="cls">AppDbContext</span>&gt; options) : <span class="fn">base</span>(options) { }
+
+    <span class="cmt">// Aggiungere qui i DbSet per le proprie entità</span>
+    <span class="kw">public</span> <span class="cls">DbSet</span>&lt;<span class="cls">Worker</span>&gt; Workers { <span class="kw">get</span>; <span class="kw">set</span>; }
+}</pre>
+  </div>
+</div>
+
+<!-- AppDbContextFactory -->
+<div class="card">
+  <div class="card-header"><span class="card-title">AppDbContextFactory.cs — Per i Comandi EF da Terminale</span><span class="card-tag tag-service">migrations</span></div>
+  <div class="card-body">
+    <p>Necessaria quando si eseguono migrazioni da terminale (<code>dotnet ef migrations add</code>) in un progetto multi-layer dove il DbContext è in un progetto separato dall'API.</p>
+    <pre><span class="kw">using</span> Microsoft.EntityFrameworkCore;
+<span class="kw">using</span> Microsoft.EntityFrameworkCore.Design;
+<span class="kw">using</span> Microsoft.Extensions.Configuration;
+
+<span class="kw">public class</span> <span class="cls">AppDbContextFactory</span> : <span class="cls">IDesignTimeDbContextFactory</span>&lt;<span class="cls">AppDbContext</span>&gt;
+{
+    <span class="kw">public</span> <span class="cls">AppDbContext</span> <span class="fn">CreateDbContext</span>(<span class="typ">string</span>[] args)
+    {
+        <span class="kw">var</span> basePath = Directory.<span class="fn">GetCurrentDirectory</span>();
+        <span class="kw">var</span> apiSettingsPath = Path.<span class="fn">Combine</span>(
+            basePath, <span class="str">".."</span>, <span class="str">"AppBase.Api"</span>, <span class="str">"appsettings.Development.json"</span>
+        );
+        <span class="typ">string</span> connectionString = <span class="kw">null</span>;
+
+        <span class="kw">if</span> (File.<span class="fn">Exists</span>(apiSettingsPath))
+        {
+            <span class="kw">var</span> config = <span class="kw">new</span> <span class="cls">ConfigurationBuilder</span>()
+                .<span class="fn">SetBasePath</span>(Path.<span class="fn">GetFullPath</span>(
+                    Path.<span class="fn">Combine</span>(basePath, <span class="str">".."</span>, <span class="str">"AppBase.Api"</span>)))
+                .<span class="fn">AddJsonFile</span>(<span class="str">"appsettings.Development.json"</span>, optional: <span class="kw">false</span>)
+                .<span class="fn">Build</span>();
+            connectionString = config.<span class="fn">GetConnectionString</span>(<span class="str">"DefaultConnection"</span>);
+        }
+
+        <span class="cmt">// Fallback se il file di config non è raggiungibile</span>
+        <span class="kw">if</span> (<span class="typ">string</span>.<span class="fn">IsNullOrWhiteSpace</span>(connectionString))
+        {
+            connectionString = <span class="str">"Host=localhost;Database=AppBaseDb;Username=postgres;Password=postgres"</span>;
+        }
+
+        <span class="kw">var</span> optionsBuilder = <span class="kw">new</span> <span class="cls">DbContextOptionsBuilder</span>&lt;<span class="cls">AppDbContext</span>&gt;();
+        optionsBuilder.<span class="fn">UseNpgsql</span>(connectionString);
+        <span class="kw">return new</span> <span class="cls">AppDbContext</span>(optionsBuilder.Options);
+    }
+}</pre>
+    <div class="info-box">
+      <div class="info-title">Quando serve AppDbContextFactory</div>
+      <div class="rule-text">EF Core cerca una factory a design-time quando il DbContext è in un progetto diverso dallo startup project (es. architettura clean con <code>Infrastructure</code> separato). Senza di essa, <code>dotnet ef migrations add</code> fallisce con errore "Unable to create DbContext".</div>
+    </div>
+  </div>
+</div>
+
+<!-- Comandi EF sintetici -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Comandi EF Core — Riferimento Rapido</span><span class="card-tag tag-rule">quick ref</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># Progetto singolo (DbContext nello stesso progetto dell'API)</span>
+dotnet ef migrations add InitialCreate
+dotnet ef database update
+
+<span class="cmt"># Progetto multi-layer (DbContext in Infrastructure, API separata)</span>
+dotnet ef migrations add InitialCreate \
+  --project dpi.infrastructure \
+  --startup-project dpi.backend
+
+<span class="cmt"># Con connection string esplicita (override appsettings)</span>
+dotnet ef database update \
+  --project dpi.infrastructure \
+  --startup-project dpi.backend \
+  --connection <span class="str">"Host=localhost;Database=DpiDb;Username=postgres;Password=postgres"</span>
+
+<span class="cmt"># Rollback — torna a una migrazione precedente</span>
+dotnet ef database update NomeMigrazioneTarget
+
+<span class="cmt"># Lista migrazioni applicate</span>
+dotnet ef migrations list
+
+<span class="cmt"># Rimuovere l'ultima migrazione (se non ancora applicata al DB)</span>
+dotnet ef migrations remove</pre>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

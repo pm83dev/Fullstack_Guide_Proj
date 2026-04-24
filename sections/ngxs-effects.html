@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NGXS — Effects & ofActionSuccessful</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-purple">⚡</div>
+  <div>
+    <div class="section-title">NGXS — Effects &amp; Actions Stream</div>
+    <div class="section-desc">ofActionSuccessful, ofActionDispatched, ofActionErrored — reagire agli eventi dello store fuori dallo State</div>
+  </div>
+</div>
+
+<!-- Concetto -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Cos'è il flusso Actions</span><span class="card-tag tag-state">concetto</span></div>
+  <div class="card-body">
+    <p>NGXS espone un stream globale di tutte le Action dispatchate tramite il servizio <strong>Actions</strong>. Puoi iscriverti per reagire a eventi fuori dallo State — notifiche, navigazione, aggiornamento di un altro State.</p>
+    <table>
+      <tr><th>Operatore</th><th>Quando scatta</th></tr>
+      <tr><td>ofActionDispatched</td><td>Appena l'Action viene dispatchata (prima dell'esecuzione)</td></tr>
+      <tr><td>ofActionSuccessful</td><td>Dopo che lo State l'ha gestita senza errori</td></tr>
+      <tr><td>ofActionErrored</td><td>Se il gestore ha lanciato un'eccezione</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Effect completo -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Effect — Esempio Completo</span><span class="card-tag tag-service">service</span></div>
+  <div class="card-body">
+    <pre><span class="dec">@Injectable</span>({ providedIn: <span class="str">'root'</span> })
+<span class="kw">export class</span> <span class="cls">PlantEffects</span> <span class="kw">implements</span> <span class="cls">OnDestroy</span> {
+
+  <span class="kw">private</span> destroy$ = <span class="kw">new</span> <span class="cls">Subject</span>&lt;<span class="typ">void</span>&gt;();
+
+  constructor(
+    <span class="kw">private</span> actions$: <span class="cls">Actions</span>,
+    <span class="kw">private</span> router:   <span class="cls">Router</span>,
+    <span class="kw">private</span> snackbar: <span class="cls">MatSnackBar</span>
+  ) {
+    <span class="cmt">// Mostra notifica dopo aggiunta riuscita</span>
+    this.actions$.pipe(
+      <span class="fn">ofActionSuccessful</span>(<span class="cls">AddVariable</span>),
+      <span class="fn">takeUntil</span>(this.destroy$)
+    ).<span class="fn">subscribe</span>(() => {
+      this.snackbar.<span class="fn">open</span>(<span class="str">'Variabile aggiunta'</span>, <span class="str">'OK'</span>, { duration: <span class="acc">3000</span> });
+    });
+
+    <span class="cmt">// Naviga alla home dopo un errore critico</span>
+    this.actions$.pipe(
+      <span class="fn">ofActionErrored</span>(<span class="cls">LoadVariables</span>),
+      <span class="fn">takeUntil</span>(this.destroy$)
+    ).<span class="fn">subscribe</span>(() => {
+      this.router.<span class="fn">navigate</span>([<span class="str">'/'</span>]);
+    });
+  }
+
+  <span class="fn">ngOnDestroy</span>() {
+    this.destroy$.<span class="fn">next</span>();
+    this.destroy$.<span class="fn">complete</span>();
+  }
+}</pre>
+  </div>
+</div>
+
+<!-- Aggiornare un secondo State -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Aggiornare un Secondo State da un Effect</span><span class="card-tag tag-action">cross-state</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// Quando LoadVariables ha successo, aggiorna il log state</span>
+this.actions$.pipe(
+  <span class="fn">ofActionSuccessful</span>(<span class="cls">LoadVariables</span>),
+  <span class="fn">takeUntil</span>(this.destroy$)
+).<span class="fn">subscribe</span>(() => {
+  this.store.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">AddLogEntry</span>({
+    action: <span class="str">'LoadVariables'</span>,
+    timestamp: <span class="kw">new</span> <span class="cls">Date</span>()
+  }));
+});</pre>
+    <div class="info-box">
+      <div class="info-title">Quando usare gli Effects</div>
+      <div class="rule-text">Usa gli Effects per side effect che non appartengono allo State: notifiche UI, navigazione, logging, aggiornamento di altri State. Non mettere logica business negli Effects.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ofActionDispatched — use case -->
+<div class="card">
+  <div class="card-header"><span class="card-title">ofActionDispatched — Use Case Spinner Globale</span><span class="card-tag tag-component">UI</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// Mostra uno spinner globale mentre qualsiasi action asincrona è in corso</span>
+constructor(<span class="kw">private</span> actions$: <span class="cls">Actions</span>, <span class="kw">private</span> store: <span class="cls">Store</span>) {
+
+  this.actions$.pipe(
+    <span class="fn">ofActionDispatched</span>(<span class="cls">LoadVariables</span>, <span class="cls">LoadAlarms</span>, <span class="cls">LoadDocuments</span>),
+    <span class="fn">takeUntil</span>(this.destroy$)
+  ).<span class="fn">subscribe</span>(() => {
+    this.store.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">SetGlobalLoading</span>(<span class="kw">true</span>));
+  });
+
+  this.actions$.pipe(
+    <span class="fn">ofActionSuccessful</span>(<span class="cls">LoadVariables</span>, <span class="cls">LoadAlarms</span>, <span class="cls">LoadDocuments</span>),
+    <span class="fn">takeUntil</span>(this.destroy$)
+  ).<span class="fn">subscribe</span>(() => {
+    this.store.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">SetGlobalLoading</span>(<span class="kw">false</span>));
+  });
+}</pre>
+  </div>
+</div>
+
+<!-- dispatch in un @Action -->
+<div class="card">
+  <div class="card-header"><span class="card-title">ctx.dispatch — Concatenare Actions dallo State</span><span class="card-tag tag-state">state</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// Dentro uno @Action, dispatcha altre Actions come side effect</span>
+<span class="dec">@Action</span>(<span class="cls">AddVariable</span>)
+<span class="fn">add</span>(ctx: <span class="cls">StateContext</span>&lt;<span class="cls">PlantStateModel</span>&gt;, { payload }: <span class="cls">AddVariable</span>) {
+  <span class="kw">return</span> this.api.<span class="fn">addVariable</span>(payload).pipe(
+    <span class="fn">tap</span>(newVar => {
+      <span class="kw">const</span> { variables } = ctx.<span class="fn">getState</span>();
+      ctx.<span class="fn">patchState</span>({ variables: [...variables, newVar] });
+
+      <span class="cmt">// Dispatcha un'altra action per notificare il log</span>
+      ctx.<span class="fn">dispatch</span>(<span class="kw">new</span> <span class="cls">LogActions</span>.<span class="cls">AddLogEntry</span>({
+        type: <span class="str">'ADD_VARIABLE'</span>,
+        data: newVar,
+        timestamp: <span class="kw">new</span> <span class="cls">Date</span>().toISOString()
+      }));
+    })
+  );
+}</pre>
+    <div class="rule-box">
+      <div class="rule-title">ctx.dispatch vs Effects — quando usare quale</div>
+      <div class="rule-text">Usa <strong>ctx.dispatch</strong> quando la seconda action dipende dal risultato della prima e deve avvenire nello stesso flusso. Usa gli <strong>Effects</strong> per side effect UI (notifiche, navigazione) che non influenzano lo stato.</div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

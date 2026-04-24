@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Angular — Componenti Dinamici con Multi-Provider</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-purple">🧩</div>
+  <div>
+    <div class="section-title">Angular — Componenti Dinamici con Multi-Provider</div>
+    <div class="section-desc">InjectionToken con multi:true, DynamicComponentsService, createComponent(), getComponents()</div>
+  </div>
+</div>
+
+<!-- Concetto -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Come Funziona — Schema Completo</span><span class="card-tag tag-pattern">pattern</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">Registrazione componenti        (providers con multi:true)</span>
+        ↓
+<span class="cmt">DynamicComponentsService        (iniettato tramite token)</span>
+        ↓
+<span class="cmt">getComponents()                 (restituisce lista filtrata)</span>
+        ↓
+<span class="cmt">allComponents nel container     (getter del componente)</span>
+        ↓
+<span class="cmt">*ngFor="let c of allComponents" (template)</span>
+        ↓
+<span class="cmt">addComponent(c) → createComponent() → container.createComponent()</span></pre>
+    <div class="info-box">
+      <div class="info-title">Perché multi:true?</div>
+      <div class="rule-text">Con <code>multi: true</code>, Angular raccoglie tutte le registrazioni con lo stesso token in un <strong>array</strong> e lo inietta come tale. Ogni modulo/feature può registrare i propri componenti indipendentemente, senza toccare il codice centrale.</div>
+    </div>
+  </div>
+</div>
+
+<!-- InjectionToken -->
+<div class="card">
+  <div class="card-header"><span class="card-title">1. Definizione del Token</span><span class="card-tag tag-action">token</span></div>
+  <div class="card-body">
+    <pre><span class="kw">import</span> { InjectionToken } <span class="kw">from</span> <span class="str">'@angular/core'</span>;
+
+<span class="kw">export interface</span> <span class="cls">DynamicComponentProvider</span> {
+  key: <span class="typ">string</span>;
+  type: <span class="kw">any</span>;         <span class="cmt">// la classe del componente Angular</span>
+  metadata?: <span class="kw">any</span>;    <span class="cmt">// dati extra (label, icona, ecc.)</span>
+}
+
+<span class="kw">export const</span> ACCREDITATION_DYNAMIC_COMPONENT_PROVIDER =
+  <span class="kw">new</span> <span class="cls">InjectionToken</span>&lt;<span class="cls">DynamicComponentProvider</span>[]&gt;(
+    <span class="str">'ACCREDITATION_DYNAMIC_COMPONENT_PROVIDER'</span>
+  );</pre>
+  </div>
+</div>
+
+<!-- Registrazione -->
+<div class="card">
+  <div class="card-header"><span class="card-title">2. Registrazione dei Componenti (multi:true)</span><span class="card-tag tag-service">providers</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// In un modulo o in providers di una route standalone</span>
+providers: [
+  {
+    provide: ACCREDITATION_DYNAMIC_COMPONENT_PROVIDER,
+    multi: <span class="kw">true</span>,
+    useValue: {
+      key: <span class="str">'textbox'</span>,
+      type: <span class="cls">TextBoxComponent</span>,
+      metadata: { label: <span class="str">'Campo Testo'</span> }
+    }
+  },
+  {
+    provide: ACCREDITATION_DYNAMIC_COMPONENT_PROVIDER,
+    multi: <span class="kw">true</span>,
+    useValue: {
+      key: <span class="str">'table'</span>,
+      type: <span class="cls">TableComponent</span>,
+      metadata: { label: <span class="str">'Tabella Dati'</span> }
+    }
+  },
+  <span class="cmt">// ogni feature aggiunge la propria voce senza toccare le altre</span>
+]</pre>
+    <div class="rule-box">
+      <div class="rule-title">Senza questo, getComponents() restituisce lista vuota</div>
+      <div class="rule-text">Se dimentichi di registrare il provider con <code>multi: true</code>, il servizio riceve un array vuoto e nessun componente dinamico viene mostrato.</div>
+    </div>
+  </div>
+</div>
+
+<!-- DynamicComponentsService -->
+<div class="card">
+  <div class="card-header"><span class="card-title">3. DynamicComponentsService</span><span class="card-tag tag-state">service</span></div>
+  <div class="card-body">
+    <pre>@<span class="cls">Injectable</span>({ providedIn: <span class="str">'root'</span> })
+<span class="kw">export class</span> <span class="cls">DynamicComponentsService</span> {
+
+  <span class="kw">constructor</span>(
+    @<span class="cls">Inject</span>(ACCREDITATION_DYNAMIC_COMPONENT_PROVIDER)
+    <span class="kw">private readonly</span> _componentsProvider: <span class="cls">DynamicComponentProvider</span>[]
+  ) {}
+
+  <span class="cmt">// Restituisce tutti i componenti, o filtrati</span>
+  <span class="fn">getComponents</span>(
+    filter?: (c: <span class="cls">DynamicComponentProvider</span>) => <span class="typ">boolean</span>
+  ): <span class="cls">DynamicComponentProvider</span>[] {
+    <span class="kw">return</span> filter
+      ? <span class="kw">this</span>._componentsProvider.<span class="fn">filter</span>(filter)
+      : <span class="kw">this</span>._componentsProvider;
+  }
+
+  <span class="cmt">// Trova il provider per un tipo specifico</span>
+  <span class="kw">private</span> <span class="fn">getComponent</span>(type: <span class="typ">string</span>): <span class="cls">DynamicComponentProvider</span> {
+    <span class="kw">const</span> found = <span class="kw">this</span>._componentsProvider.<span class="fn">find</span>(c => c.key === type);
+    <span class="kw">if</span> (!found) <span class="kw">throw new</span> <span class="cls">Error</span>(<span class="str">`Componente "${type}" non registrato`</span>);
+    <span class="kw">return</span> found;
+  }
+
+  <span class="cmt">// Crea il componente nel ViewContainerRef</span>
+  <span class="fn">createComponent</span>(
+    container: <span class="cls">ViewContainerRef</span>,
+    definition: { type: <span class="typ">string</span>; [key: <span class="typ">string</span>]: <span class="kw">any</span> }
+  ) {
+    <span class="kw">const</span> componentData = <span class="kw">this</span>.<span class="fn">getComponent</span>(definition.type);
+    <span class="kw">const</span> componentRef  = container.<span class="fn">createComponent</span>(componentData.type);
+
+    <span class="cmt">// Passa la definizione al componente dinamico</span>
+    <span class="kw">const</span> instance = componentRef.instance <span class="kw">as</span> <span class="cls">DynamicComponent</span>;
+    instance.<span class="fn">loadDefinition</span>(definition);
+
+    <span class="kw">return</span> { componentRef, dynamicComponent: instance, metadata: componentData.metadata };
+  }
+}</pre>
+  </div>
+</div>
+
+<!-- Uso nel componente container -->
+<div class="card">
+  <div class="card-header"><span class="card-title">4. Uso nel Componente Container</span><span class="card-tag tag-component">container</span></div>
+  <div class="card-body">
+    <pre>@<span class="cls">Component</span>({
+  selector: <span class="str">'accreditation-components-container'</span>,
+  template: <span class="str">`
+    &lt;div *ngFor="let c of allComponents"&gt;
+      &lt;button (click)="addComponent(c)"&gt;
+        {{ c.metadata?.label }}
+      &lt;/button&gt;
+    &lt;/div&gt;
+    &lt;ng-container #host&gt;&lt;/ng-container&gt;
+  `</span>
+})
+<span class="kw">export class</span> <span class="cls">AccreditationComponentsContainerComponent</span> {
+  @<span class="cls">ViewChild</span>(<span class="str">'host'</span>, { read: <span class="cls">ViewContainerRef</span> })
+  container!: <span class="cls">ViewContainerRef</span>;
+
+  <span class="kw">constructor</span>(
+    <span class="kw">private</span> _dynamicComponentService: <span class="cls">DynamicComponentsService</span>,
+    <span class="kw">public</span>  filter: <span class="cls">FilterService</span>   <span class="cmt">// opzionale</span>
+  ) {}
+
+  <span class="cmt">// Lista di tutti i componenti disponibili (filtrabili)</span>
+  <span class="kw">public get</span> allComponents(): <span class="cls">DynamicComponentProvider</span>[] {
+    <span class="kw">return this</span>._dynamicComponentService
+      .<span class="fn">getComponents</span>(<span class="kw">this</span>.filter?.isValidItem);
+  }
+
+  <span class="fn">addComponent</span>(provider: <span class="cls">DynamicComponentProvider</span>): <span class="kw">void</span> {
+    <span class="kw">this</span>._dynamicComponentService
+      .<span class="fn">createComponent</span>(<span class="kw">this</span>.container, { type: provider.key });
+  }
+}</pre>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

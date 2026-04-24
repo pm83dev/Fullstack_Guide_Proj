@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fullstack Guide — Guida Rapida</title>
+    <!-- Bootstrap 5 CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0d0f12;
+        --surface: #141720;
+        --surface2: #1c2030;
+        --border: #252a3a;
+        --accent: #f97316;
+        --accent2: #3b82f6;
+        --accent3: #22c55e;
+        --accent4: #a855f7;
+        --text: #e2e8f0;
+        --text-dim: #94a3b8;
+        --text-dimmer: #475569;
+        --font-mono: "JetBrains Mono NF", monospace;
+        --font-sans: "IBM Plex Sans", sans-serif;
+        --sidebar-w: 260px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-sans);
+        font-size: 14px;
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* ── SIDEBAR ── */
+      .sidebar {
+        width: var(--sidebar-w);
+        min-width: var(--sidebar-w);
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow-y: auto;
+      }
+
+      .sidebar-header {
+        padding: 18px 16px 12px;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+
+      .sidebar-logo {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--accent);
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+      }
+
+      .sidebar-subtitle {
+        font-size: 11px;
+        color: var(--text-dimmer);
+        font-family: var(--font-mono);
+        margin-top: 2px;
+      }
+
+      /* ── RICERCA ── */
+      .search-box {
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+
+      .search-wrap {
+        position: relative;
+      }
+
+      .search-wrap::before {
+        content: "⌕";
+        position: absolute;
+        left: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-dimmer);
+        font-size: 14px;
+        pointer-events: none;
+      }
+
+      .search-input {
+        width: 100%;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 5px 8px 5px 26px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        outline: none;
+      }
+
+      .search-input:focus {
+        border-color: var(--accent);
+      }
+      .search-input::placeholder {
+        color: var(--text-dimmer);
+      }
+
+      /* ── NAV ── */
+      .nav-body {
+        flex: 1;
+        overflow-y: auto;
+      }
+
+      .nav-section {
+        padding: 6px 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .nav-section-title {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--text-dimmer);
+        padding: 5px 14px 3px;
+      }
+
+      /* ── ACCORDION OVERRIDE ── */
+      .accordion-item.nav-section {
+        background: var(--surface);
+        border: none;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .accordion-button.nav-section-title {
+        background: var(--surface);
+        color: var(--accent);
+        font-family: var(--font-mono);
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        padding: 8px 14px;
+        box-shadow: none;
+      }
+
+      .accordion-button.nav-section-title:not(.collapsed) {
+        background: var(--surface2);
+        color: var(--accent);
+        box-shadow: none;
+      }
+
+      .accordion-button.nav-section-title::after {
+        filter: invert(60%) sepia(80%) saturate(700%) hue-rotate(350deg);
+      }
+
+      .accordion-button.nav-section-title:focus {
+        box-shadow: none;
+      }
+
+      .accordion-body {
+        background: var(--surface);
+        padding: 0;
+      }
+
+      .accordion-collapse {
+        background: var(--surface);
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 14px;
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--text-dim);
+        border-left: 2px solid transparent;
+        transition: all 0.12s;
+        user-select: none;
+      }
+
+      .nav-item:hover {
+        background: var(--surface2);
+        color: var(--text);
+      }
+      .nav-item.active {
+        border-left-color: var(--accent);
+        color: var(--text);
+        background: rgba(249, 115, 22, 0.07);
+      }
+
+      .nav-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .dot-orange {
+        background: var(--accent);
+      }
+      .dot-blue {
+        background: var(--accent2);
+      }
+      .dot-purple {
+        background: var(--accent4);
+      }
+      .dot-green {
+        background: var(--accent3);
+      }
+      .dot-red {
+        background: #ef4444;
+      }
+      .dot-cyan {
+        background: #06b6d4;
+      }
+      .dot-pink {
+        background: #ec4899;
+      }
+      .dot-yellow {
+        background: #eab308;
+      }
+
+      /* nav filtro ricerca */
+      .nav-item.hidden {
+        display: none;
+      }
+
+      /* ── IFRAME ── */
+      .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      #content-frame {
+        flex: 1;
+        border: none;
+        width: 100%;
+        height: 100%;
+        background: var(--bg);
+      }
+
+      /* ── SCROLLBAR ── */
+      ::-webkit-scrollbar {
+        width: 5px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--bg);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-dimmer);
+      }
+
+      /* ── BADGE SECTION COUNT ── */
+      .nav-count {
+        margin-left: auto;
+        font-family: var(--font-mono);
+        font-size: 9px;
+        color: var(--text-dimmer);
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 1px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ══════════════════════════════════════════
+     SIDEBAR
+     Per aggiungere una voce:
+       1. Aggiungi un <div class="nav-item"> qui con data-src="sections/nomefile.html"
+       2. Crea il file in sections/nomefile.html
+     Non toccare altro.
+══════════════════════════════════════════ -->
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">Fullstack Guide</div>
+        <div class="sidebar-subtitle">guida rapida // PM Software</div>
+      </div>
+
+      <div class="search-box">
+        <div class="search-wrap">
+          <input
+            class="search-input"
+            type="text"
+            placeholder="filtra sezioni..."
+            id="searchInput"
+            oninput="filterNav(this.value)"
+          />
+        </div>
+      </div>
+
+      <div class="accordion nav-body" id="navAccordion">
+        <!-- Core NGXS -->
+        <div class="accordion-item nav-section">
+          <h2 class="accordion-header" id="headingCoreNgxs">
+            <button
+              class="accordion-button nav-section-title collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseCoreNgxs"
+              aria-expanded="true"
+              aria-controls="collapseCoreNgxs"
+            >
+              Core NGXS
+            </button>
+          </h2>
+          <div
+            id="collapseCoreNgxs"
+            class="accordion-collapse collapse show"
+            aria-labelledby="headingCoreNgxs"
+            data-bs-parent="#navAccordion"
+          >
+            <div class="accordion-body p-0">
+              <div class="nav-item" data-src="sections/flusso.html">
+                <span class="nav-dot dot-orange"></span>Flusso Completo
+              </div>
+              <div class="nav-item" data-src="sections/service.html">
+                <span class="nav-dot dot-green"></span>Service
+              </div>
+              <div class="nav-item" data-src="sections/action.html">
+                <span class="nav-dot dot-blue"></span>Action
+              </div>
+              <div class="nav-item" data-src="sections/state.html">
+                <span class="nav-dot dot-purple"></span>State
+              </div>
+              <div class="nav-item" data-src="sections/component.html">
+                <span class="nav-dot dot-red"></span>Component
+              </div>
+              <div class="nav-item" data-src="sections/payload.html">
+                <span class="nav-dot dot-orange"></span>action.payload
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Pattern -->
+        <div class="accordion-item nav-section">
+          <h2 class="accordion-header" id="headingPattern">
+            <button
+              class="accordion-button nav-section-title collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapsePattern"
+              aria-expanded="false"
+              aria-controls="collapsePattern"
+            >
+              Pattern
+            </button>
+          </h2>
+          <div
+            id="collapsePattern"
+            class="accordion-collapse collapse"
+            aria-labelledby="headingPattern"
+            data-bs-parent="#navAccordion"
+          >
+            <div class="accordion-body p-0">
+              <div class="nav-item" data-src="sections/array.html">
+                <span class="nav-dot dot-purple"></span>State per Array
+              </div>
+              <div class="nav-item" data-src="sections/modal.html">
+                <span class="nav-dot dot-cyan"></span>Modal + ng-content
+              </div>
+              <div class="nav-item" data-src="sections/modal-mode.html">
+                <span class="nav-dot dot-pink"></span>Modal add/edit Mode
+              </div>
+              <div
+                class="nav-item"
+                data-src="sections/angular-binding-parentchild.html"
+              >
+                <span class="nav-dot dot-blue"></span>@Input/@Output
+                Parent-Child
+              </div>
+              <div
+                class="nav-item"
+                data-src="sections/angular-raggruppare-eventi.html"
+              >
+                <span class="nav-dot dot-orange"></span>Raggruppare Eventi (Map)
+              </div>
+              <div
+                class="nav-item"
+                data-src="sections/angular-dynamic-components.html"
+              >
+                <span class="nav-dot dot-purple"></span>Componenti Dinamici
+                Multi-Provider
+              </div>
+              <div class="nav-item" data-src="sections/angular-event-log.html">
+                <span class="nav-dot dot-cyan"></span>Event Log Component
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- RxJS -->
+        <div class="accordion-item nav-section">
+          <h2 class="accordion-header" id="headingRxjs">
+            <button
+              class="accordion-button nav-section-title collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseRxjs"
+              aria-expanded="false"
+              aria-controls="collapseRxjs"
+            >
+              RxJS
+            </button>
+          </h2>
+          <div
+            id="collapseRxjs"
+            class="accordion-collapse collapse"
+            aria-labelledby="headingRxjs"
+            data-bs-parent="#navAccordion"
+          >
+            <div class="accordion-body p-0">
+              <div class="nav-item" data-src="sections/rxjs.html">
+                <span class="nav-dot dot-blue"></span>Observable / RxJS — Base
+              </div>
+              <div class="nav-item" data-src="sections/rxjs-avanzato.html">
+                <span class="nav-dot dot-cyan"></span>RxJS — Operatori Avanzati
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Regole d'oro -->
+        <div class="accordion-item nav-section">
+          <h2 class="accordion-header" id="headingRegole">
+            <button
+              class="accordion-button nav-section-title collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseRegole"
+              aria-expanded="false"
+              aria-controls="collapseRegole"
+            >
+              Regole d'oro
+            </button>
+          </h2>
+          <div
+            id="collapseRegole"
+            class="accordion-collapse collapse"
+            aria-labelledby="headingRegole"
+            data-bs-parent="#navAccordion"
+          >
+            <div class="accordion-body p-0">
+              <div class="nav-item" data-src="sections/regole.html">
+                <span class="nav-dot dot-orange"></span>Regole &amp; Best
+                Practices
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Setup & Deploy -->
+        <div class="accordion-item nav-section">
+          <h2 class="accordion-header" id="headingSetup">
+            <button
+              class="accordion-button nav-section-title collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseSetup"
+              aria-expanded="false"
+              aria-controls="collapseSetup"
+            >
+              Setup &amp; Deploy
+            </button>
+          </h2>
+          <div
+            id="collapseSetup"
+            class="accordion-collapse collapse"
+            aria-labelledby="headingSetup"
+            data-bs-parent="#navAccordion"
+          >
+            <div class="accordion-body p-0">
+              <div class="nav-item" data-src="sections/setup.html">
+                <span class="nav-dot dot-green"></span>Setup Progetto da Zero
+              </div>
+              <div class="nav-item" data-src="sections/spaproxy.html">
+                <span class="nav-dot dot-orange"></span>SpaProxy .NET + Angular
+              </div>
+              <div class="nav-item" data-src="sections/deploy.html">
+                <span class="nav-dot dot-red"></span>Deploy VPS (Docker —
+                sintesi)
+              </div>
+              <div class="nav-item" data-src="sections/deploy-vps.html">
+                <span class="nav-dot dot-red"></span>Deploy VPS — Procedura
+                Completa
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- .NET Backend -->
+        <div class="accordion-item nav-section">
+          <h2 class="accordion-header" id="headingDotnet">
+            <button
+              class="accordion-button nav-section-title collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseDotnet"
+              aria-expanded="false"
+              aria-controls="collapseDotnet"
+            >
+              .NET Backend
+            </button>
+          </h2>
+          <div
+            id="collapseDotnet"
+            class="accordion-collapse collapse"
+            aria-labelledby="headingDotnet"
+            data-bs-parent="#navAccordion"
+          >
+            <div class="accordion-body p-0">
+              <div class="nav-item" data-src="sections/dotnet-programcs.html">
+                <span class="nav-dot dot-blue"></span>Program.cs
+              </div>
+              <div class="nav-item" data-src="sections/dotnet-controller.html">
+                <span class="nav-dot dot-green"></span>Controller &amp; CRUD
+              </div>
+              <div class="nav-item" data-src="sections/dotnet-efcore.html">
+                <span class="nav-dot dot-purple"></span>Entity Framework Core
+              </div>
+              <div class="nav-item" data-src="sections/dotnet-jwt.html">
+                <span class="nav-dot dot-orange"></span>JWT Authentication
+              </div>
+              <div class="nav-item" data-src="sections/dotnet-errori.html">
+                <span class="nav-dot dot-red"></span>Errori Comuni .NET/NGXS
+              </div>
+              <div class="nav-item" data-src="sections/docker-postgres-ef.html">
+                <span class="nav-dot dot-cyan"></span>Docker — PostgreSQL + EF
+                Migrations
+              </div>
+              <div class="nav-item" data-src="sections/dapper-query.html">
+                <span class="nav-dot dot-yellow"></span>Dapper — Query e Pattern
+              </div>
+              <div class="nav-item" data-src="sections/dotnet-di-testing.html">
+                <span class="nav-dot dot-green"></span>DI Extension + xUnit
+                Testing
+              </div>
+              <div class="nav-item" data-src="sections/csharp-scope.html">
+                <span class="nav-dot dot-orange"></span>C# — Scope e Blocchi
+              </div>
+              <div class="nav-item" data-src="sections/sql-trigger.html">
+                <span class="nav-dot dot-red"></span>SQL Server — Gestione
+                Trigger
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Linux & WSL2 -->
+        <div class="accordion-item nav-section">
+          <h2 class="accordion-header" id="headingLinux">
+            <button
+              class="accordion-button nav-section-title collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseLinux"
+              aria-expanded="false"
+              aria-controls="collapseLinux"
+            >
+              Linux &amp; WSL2
+            </button>
+          </h2>
+          <div
+            id="collapseLinux"
+            class="accordion-collapse collapse"
+            aria-labelledby="headingLinux"
+            data-bs-parent="#navAccordion"
+          >
+            <div class="accordion-body p-0">
+              <div class="nav-item" data-src="sections/linux-comandi.html">
+                <span class="nav-dot dot-green"></span>Comandi Linux Essenziali
+              </div>
+              <div class="nav-item" data-src="sections/wsl2-vscode.html">
+                <span class="nav-dot dot-cyan"></span>WSL2 + VS Code Setup
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- NGXS — Guide Avanzate -->
+        <div class="accordion-item nav-section">
+          <h2 class="accordion-header" id="headingNgxsAdv">
+            <button
+              class="accordion-button nav-section-title collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseNgxsAdv"
+              aria-expanded="false"
+              aria-controls="collapseNgxsAdv"
+            >
+              NGXS — Guide Avanzate
+            </button>
+          </h2>
+          <div
+            id="collapseNgxsAdv"
+            class="accordion-collapse collapse"
+            aria-labelledby="headingNgxsAdv"
+            data-bs-parent="#navAccordion"
+          >
+            <div class="accordion-body p-0">
+              <div class="nav-item" data-src="sections/ngxs-effects.html">
+                <span class="nav-dot dot-purple"></span>Effects &amp;
+                ofActionSuccessful
+              </div>
+              <div
+                class="nav-item"
+                data-src="sections/ngxs-esempio-ricerca.html"
+              >
+                <span class="nav-dot dot-blue"></span>Esempio Completo — Ricerca
+                Utenti
+              </div>
+              <div class="nav-item" data-src="sections/payload-patterns.html">
+                <span class="nav-dot dot-orange"></span>Payload — Pattern
+                Avanzati
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Angular — Setup -->
+        <div class="accordion-item nav-section">
+          <h2 class="accordion-header" id="headingAngularSetup">
+            <button
+              class="accordion-button nav-section-title collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseAngularSetup"
+              aria-expanded="false"
+              aria-controls="collapseAngularSetup"
+            >
+              Angular — Setup
+            </button>
+          </h2>
+          <div
+            id="collapseAngularSetup"
+            class="accordion-collapse collapse"
+            aria-labelledby="headingAngularSetup"
+            data-bs-parent="#navAccordion"
+          >
+            <div class="accordion-body p-0">
+              <div
+                class="nav-item"
+                data-src="sections/angular-standalone-setup.html"
+              >
+                <span class="nav-dot dot-red"></span>Angular 20+ Standalone
+                Setup
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Infrastruttura -->
+        <div class="accordion-item nav-section">
+          <h2 class="accordion-header" id="headingInfra">
+            <button
+              class="accordion-button nav-section-title collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseInfra"
+              aria-expanded="false"
+              aria-controls="collapseInfra"
+            >
+              Infrastruttura
+            </button>
+          </h2>
+          <div
+            id="collapseInfra"
+            class="accordion-collapse collapse"
+            aria-labelledby="headingInfra"
+            data-bs-parent="#navAccordion"
+          >
+            <div class="accordion-body p-0">
+              <div class="nav-item" data-src="sections/pubblicazione-siti.html">
+                <span class="nav-dot dot-cyan"></span>Pubblicazione — IIS +
+                Cloudflare
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- .NET MAUI -->
+        <div class="accordion-item nav-section">
+          <h2 class="accordion-header" id="headingMaui">
+            <button
+              class="accordion-button nav-section-title collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseMaui"
+              aria-expanded="false"
+              aria-controls="collapseMaui"
+            >
+              .NET MAUI
+            </button>
+          </h2>
+          <div
+            id="collapseMaui"
+            class="accordion-collapse collapse"
+            aria-labelledby="headingMaui"
+            data-bs-parent="#navAccordion"
+          >
+            <div class="accordion-body p-0">
+              <div class="nav-item" data-src="sections/maui-xaml.html">
+                <span class="nav-dot dot-purple"></span>MAUI XAML — RefreshView
+                &amp; CollectionView
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Architettura -->
+        <div class="accordion-item nav-section">
+          <h2 class="accordion-header" id="headingArch">
+            <button
+              class="accordion-button nav-section-title collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseArch"
+              aria-expanded="false"
+              aria-controls="collapseArch"
+            >
+              Architettura
+            </button>
+          </h2>
+          <div
+            id="collapseArch"
+            class="accordion-collapse collapse"
+            aria-labelledby="headingArch"
+            data-bs-parent="#navAccordion"
+          >
+            <div class="accordion-body p-0">
+              <div class="nav-item" data-src="sections/event-sourcing.html">
+                <span class="nav-dot dot-orange"></span>Event Sourcing — Pattern
+                Completo
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Progetti -->
+        <div class="accordion-item nav-section">
+          <h2 class="accordion-header" id="headingProgetti">
+            <button
+              class="accordion-button nav-section-title collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseProgetti"
+              aria-expanded="false"
+              aria-controls="collapseProgetti"
+            >
+              Progetti
+            </button>
+          </h2>
+          <div
+            id="collapseProgetti"
+            class="accordion-collapse collapse"
+            aria-labelledby="headingProgetti"
+            data-bs-parent="#navAccordion"
+          >
+            <div class="accordion-body p-0">
+              <div class="nav-item" data-src="sections/sds-analyzer.html">
+                <span class="nav-dot dot-purple"></span>SDS Analyzer —
+                Architettura
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- /nav-body -->
+    </nav>
+
+    <!-- ══ CONTENT (iframe) ══ -->
+    <main class="main">
+      <iframe
+        id="content-frame"
+        src="sections/flusso.html"
+        title="Contenuto sezione"
+      ></iframe>
+    </main>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      // ── Navigazione ──
+      const frame = document.getElementById("content-frame");
+      const items = document.querySelectorAll(".nav-item[data-src]");
+
+      function loadSection(item) {
+        items.forEach((i) => i.classList.remove("active"));
+        item.classList.add("active");
+        frame.src = item.dataset.src;
+      }
+
+      items.forEach((item) => {
+        item.addEventListener("click", () => loadSection(item));
+      });
+
+      // Marca il primo come attivo al caricamento
+      if (items.length > 0) items[0].classList.add("active");
+
+      // ── Filtro ricerca ──
+      function filterNav(query) {
+        const q = query.trim().toLowerCase();
+        items.forEach((item) => {
+          const text = item.textContent.trim().toLowerCase();
+          if (!q || text.includes(q)) {
+            item.classList.remove("hidden");
+          } else {
+            item.classList.add("hidden");
+          }
+        });
+        // Mostra/nascondi i titoli di sezione se tutti i figli sono nascosti
+        document
+          .querySelectorAll(".accordion-item.nav-section")
+          .forEach((section) => {
+            const visible = [...section.querySelectorAll(".nav-item")].some(
+              (i) => !i.classList.contains("hidden"),
+            );
+            section.style.display = visible ? "" : "none";
+          });
+      }
+
+      // ── Keyboard: frecce su/giù per navigare ──
+      document.addEventListener("keydown", (e) => {
+        if (document.activeElement === document.getElementById("searchInput"))
+          return;
+        const active = document.querySelector(".nav-item.active");
+        const visibleItems = [...items].filter(
+          (i) => !i.classList.contains("hidden"),
+        );
+        if (!visibleItems.length) return;
+        let idx = visibleItems.indexOf(active);
+        if (e.key === "ArrowDown") {
+          idx = Math.min(idx + 1, visibleItems.length - 1);
+          loadSection(visibleItems[idx]);
+          e.preventDefault();
+        }
+        if (e.key === "ArrowUp") {
+          idx = Math.max(idx - 1, 0);
+          loadSection(visibleItems[idx]);
+          e.preventDefault();
+        }
+      });
+    </script>
+  </body>
+</html>

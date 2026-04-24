@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dapper — Query e Pattern</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-blue">🗄</div>
+  <div>
+    <div class="section-title">Dapper — Query e Pattern</div>
+    <div class="section-desc">Query&lt;T&gt; e QueryAsync&lt;T&gt; con SQL JOIN, parametri nominati, gestione errori</div>
+  </div>
+</div>
+
+<!-- Installazione -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Setup — NuGet</span><span class="card-tag tag-action">nuget</span></div>
+  <div class="card-body">
+    <pre>dotnet add package Dapper
+dotnet add package System.Data.SqlClient  <span class="cmt"># oppure Microsoft.Data.SqlClient</span></pre>
+    <div class="info-box">
+      <div class="info-title">Dapper vs EF Core</div>
+      <div class="rule-text">Dapper è un micro-ORM: scrive SQL a mano, mappa automaticamente i risultati sul DTO. Ottimo per query complesse con JOIN multipli dove EF Core diventerebbe verboso. Non gestisce migrazioni o change tracking.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Query sincrona -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Query&lt;T&gt; — Versione Sincrona</span><span class="card-tag tag-state">sync</span></div>
+  <div class="card-body">
+    <pre><span class="kw">public</span> <span class="cls">List</span>&lt;<span class="cls">OrderQuantoDto</span>&gt; <span class="fn">SelectOrderQuanto</span>(
+    <span class="typ">string</span> annoEsercizio = <span class="str">"2025"</span>,
+    <span class="typ">int</span> avanzMin = <span class="num">10</span>,
+    <span class="typ">int</span> avanzMax = <span class="num">90</span>,
+    <span class="typ">string</span> terminale = <span class="str">"TER01"</span>)
+{
+    <span class="kw">var</span> connection = _sqlConnection.<span class="fn">CreateConnectionQuantoDb</span>();
+    <span class="kw">if</span> (connection == <span class="kw">null</span>)
+        <span class="kw">throw new</span> <span class="cls">InvalidOperationException</span>(<span class="str">"Impossibile ottenere la connessione."</span>);
+
+    <span class="kw">var</span> sql = <span class="str">@"
+    SELECT QA_T_T_DOCP.Docume,
+           Quanto.IS_T_R_DOCP.N_ID_R_DOCP,
+           Quanto.IS_T_R_DOCP.C_ID_ARTICOLO,
+           Quanto.IS_T_R_DOCP.C_ID_VAR_ART,
+           Quanto.IS_T_R_DOCP.C_DES_R_DOCP,
+           Quanto.IS_T_R_DOCP.N_QTA_USR_R_DOCP,
+           Quanto.IS_T_R_DOCP.C_ID_UM
+    FROM QA_T_T_DOCP
+    INNER JOIN Quanto.IS_T_R_DOCP
+        ON QA_T_T_DOCP.N_ID_DITTA = Quanto.IS_T_R_DOCP.N_ID_DITTA
+       AND QA_T_T_DOCP.N_NUM_DOCP = Quanto.IS_T_R_DOCP.N_NUM_DOCP
+       AND Quanto.IS_T_R_DOCP.N_ID_R_DOCP_SUP IS NULL
+    WHERE QA_T_T_DOCP.C_ANNO_ESERCIZIO &gt;= @AnnoEsercizio
+      AND QA_T_T_DOCP.Avanz &gt;= @AvanzMin
+      AND QA_T_T_DOCP.Avanz &lt; @AvanzMax
+      AND QA_T_T_DOCP.Termin = @Terminale"</span>;
+
+    <span class="kw">try</span>
+    {
+        <span class="kw">using</span> (connection)
+        {
+            <span class="kw">var</span> results = connection.<span class="fn">Query</span>&lt;<span class="cls">OrderQuantoDto</span>&gt;(
+                sql,
+                <span class="kw">new</span> {
+                    AnnoEsercizio = annoEsercizio,
+                    AvanzMin = avanzMin,
+                    AvanzMax = avanzMax,
+                    Terminale = terminale
+                }
+            ).<span class="fn">ToList</span>();
+
+            <span class="kw">return</span> results;
+        }
+    }
+    <span class="kw">catch</span> (<span class="cls">Exception</span> ex)
+    {
+        <span class="kw">throw new</span> <span class="cls">InvalidOperationException</span>(
+            <span class="str">$"Errore recupero ordini: {ex.Message}"</span>, ex);
+    }
+}</pre>
+  </div>
+</div>
+
+<!-- Query asincrona -->
+<div class="card">
+  <div class="card-header"><span class="card-title">QueryAsync&lt;T&gt; — Versione Asincrona</span><span class="card-tag tag-service">async</span></div>
+  <div class="card-body">
+    <pre><span class="kw">public async</span> <span class="cls">Task</span>&lt;<span class="cls">List</span>&lt;<span class="cls">OrderQuantoDto</span>&gt;&gt; <span class="fn">SelectOrderQuantoAsync</span>(
+    <span class="typ">string</span> annoEsercizio = <span class="str">"2025"</span>,
+    <span class="typ">int</span> avanzMin = <span class="num">10</span>,
+    <span class="typ">int</span> avanzMax = <span class="num">90</span>,
+    <span class="typ">string</span> terminale = <span class="str">"TER01"</span>)
+{
+    <span class="kw">var</span> connection = _sqlConnection.<span class="fn">CreateConnectionQuantoDb</span>();
+    <span class="kw">if</span> (connection == <span class="kw">null</span>)
+        <span class="kw">throw new</span> <span class="cls">InvalidOperationException</span>(<span class="str">"Impossibile ottenere la connessione."</span>);
+
+    <span class="cmt">// stessa variabile sql della versione sincrona...</span>
+
+    <span class="kw">try</span>
+    {
+        <span class="kw">using</span> (connection)
+        {
+            <span class="kw">var</span> results = <span class="kw">await</span> connection.<span class="fn">QueryAsync</span>&lt;<span class="cls">OrderQuantoDto</span>&gt;(
+                sql,
+                <span class="kw">new</span> {
+                    AnnoEsercizio = annoEsercizio,
+                    AvanzMin = avanzMin,
+                    AvanzMax = avanzMax,
+                    Terminale = terminale
+                }
+            );
+
+            <span class="kw">return</span> results.<span class="fn">ToList</span>();
+        }
+    }
+    <span class="kw">catch</span> (<span class="cls">Exception</span> ex)
+    {
+        <span class="kw">throw new</span> <span class="cls">InvalidOperationException</span>(
+            <span class="str">$"Errore recupero ordini: {ex.Message}"</span>, ex);
+    }
+}</pre>
+    <div class="rule-box">
+      <div class="rule-title">Differenza chiave</div>
+      <div class="rule-text"><code>Query&lt;T&gt;</code> restituisce <code>IEnumerable&lt;T&gt;</code> direttamente. <code>QueryAsync&lt;T&gt;</code> restituisce <code>Task&lt;IEnumerable&lt;T&gt;&gt;</code> — aggiungi <code>.ToList()</code> dopo <code>await</code> per materializzare.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Altri metodi Dapper -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Altri Metodi Dapper — Riferimento Rapido</span><span class="card-tag tag-rule">quick ref</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// Singola riga (null se non trovata)</span>
+<span class="kw">var</span> item = connection.<span class="fn">QueryFirstOrDefault</span>&lt;<span class="cls">MyDto</span>&gt;(sql, <span class="kw">new</span> { Id = id });
+
+<span class="cmt">// Scalare (es. COUNT, SUM)</span>
+<span class="kw">var</span> count = connection.<span class="fn">ExecuteScalar</span>&lt;<span class="typ">int</span>&gt;(<span class="str">"SELECT COUNT(*) FROM Orders"</span>);
+
+<span class="cmt">// INSERT / UPDATE / DELETE (righe interessate)</span>
+<span class="kw">int</span> rows = connection.<span class="fn">Execute</span>(
+    <span class="str">"UPDATE Orders SET Status = @Status WHERE Id = @Id"</span>,
+    <span class="kw">new</span> { Status = <span class="str">"Done"</span>, Id = orderId });
+
+<span class="cmt">// Multiple result sets</span>
+<span class="kw">using var</span> multi = connection.<span class="fn">QueryMultiple</span>(sql, params);
+<span class="kw">var</span> headers = multi.<span class="fn">Read</span>&lt;<span class="cls">HeaderDto</span>&gt;().<span class="fn">ToList</span>();
+<span class="kw">var</span> lines   = multi.<span class="fn">Read</span>&lt;<span class="cls">LineDto</span>&gt;().<span class="fn">ToList</span>();</pre>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

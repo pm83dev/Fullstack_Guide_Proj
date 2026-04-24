@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pubblicazione Siti — IIS + Cloudflare Tunnel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-cyan">🌐</div>
+  <div>
+    <div class="section-title">Pubblicazione Siti — IIS + Cloudflare Tunnel</div>
+    <div class="section-desc">PM Software &amp; Automation — Esporre siti e app Docker su ProDesk tramite dominio pubblico</div>
+  </div>
+</div>
+
+<!-- Architettura -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Architettura Generale</span><span class="card-tag tag-pattern">overview</span></div>
+  <div class="card-body">
+    <div class="flow">
+      <div class="flow-row"><span class="flow-node fn-blue">Browser</span><span class="flow-arrow">→ HTTPS →</span><span class="flow-node fn-orange">Cloudflare</span><span class="flow-arrow">→ Tunnel →</span><span class="flow-node fn-red">IIS (ProDesk)</span><span class="flow-arrow">→</span><span class="flow-node fn-green">App/Docker</span></div>
+    </div>
+    <table>
+      <tr><th>Caso</th><th>Flusso</th></tr>
+      <tr><td>Sito HTML statico</td><td>Cloudflare Tunnel → IIS (porta 8080) → wwwroot/</td></tr>
+      <tr><td>App Docker</td><td>Cloudflare Tunnel → IIS (porta 8081, ARR reverse proxy) → Container Docker (porta 5100)</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- PARTE A -->
+<div class="card">
+  <div class="card-header"><span class="card-title">PARTE A — Sito HTML Statico su IIS</span><span class="card-tag tag-service">IIS</span></div>
+  <div class="card-body">
+    <pre><span class="cmt"># A2 — Configurare IIS Manager</span>
+Sites → Add Website:
+  Site name:     testsito
+  Physical path: C:\inetpub\wwwroot\testsito
+  Port:          8080
+  Host name:     ← lasciare VUOTO (importante!)
+
+<span class="cmt"># Verificare che risponda in locale</span>
+curl -v http://localhost:8080</pre>
+    <div class="rule-box">
+      <div class="rule-title">⚠ Host name DEVE essere vuoto</div>
+      <div class="rule-text">Se si inserisce un hostname in IIS, le richieste dal tunnel Cloudflare vengono rifiutate con errore <strong>400 Invalid Hostname</strong>.</div>
+    </div>
+
+    <pre><span class="cmt"># A3 — Cloudflare Dashboard → Zero Trust → Networks → Tunnels
+# → Edit → Public Hostname → Add a public hostname:</span>
+Subdomain: testsito
+Domain:    pm-softwareautomation.com
+Type:      HTTP
+URL:       http://localhost:8080
+
+<span class="cmt"># config.yml del tunnel (C:\Users\pc\.cloudflared\config.yml)</span>
+tunnel: &lt;tunnel-id&gt;
+credentials-file: C:\Users\pc\.cloudflared\&lt;tunnel-id&gt;.json
+ingress:
+  - hostname: testsito.pm-softwareautomation.com
+    service: http://localhost:8080
+  - service: http_status:404
+
+<span class="cmt"># Riavviare cloudflared (PowerShell)</span>
+Restart-Service cloudflared</pre>
+
+    <pre><span class="cmt"># A4 — Verifica DNS Cloudflare</span>
+<span class="cmt"># Il record DEVE essere Proxied (nuvoletta arancione)</span>
+Resolve-DnsName testsito.pm-softwareautomation.com -Server 1.1.1.1
+<span class="cmt"># Deve restituire indirizzi A IPv4 di Cloudflare (es. 188.114.96.7)</span>
+
+<span class="cmt"># Test finale</span>
+curl -v https://testsito.pm-softwareautomation.com</pre>
+  </div>
+</div>
+
+<!-- PARTE B -->
+<div class="card">
+  <div class="card-header"><span class="card-title">PARTE B — App Docker tramite IIS Reverse Proxy</span><span class="card-tag tag-action">Docker + IIS</span></div>
+  <div class="card-body">
+    <p><strong>Prerequisiti:</strong> Docker Desktop installato, IIS con moduli <strong>ARR</strong> (Application Request Routing) e <strong>URL Rewrite</strong> installati da iis.net.</p>
+
+    <pre><span class="cmt"># B3 — docker-compose.yml dell'app</span>
+services:
+  app:
+    image: mia-app
+    restart: unless-stopped
+    ports:
+      - <span class="str">"5100:80"</span>
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+
+docker compose up -d
+curl -v http://localhost:5100   <span class="cmt"># deve rispondere 200 OK</span></pre>
+
+    <pre><span class="cmt"># B4 — IIS: crea sito come reverse proxy</span>
+Sites → Add Website:
+  Site name:     demo-mia-app
+  Physical path: C:\inetpub\wwwroot\demo-mia-app  (cartella vuota)
+  Port:          8081
+  Host name:     ← VUOTO
+
+<span class="cmt"># Configura URL Rewrite come reverse proxy</span>
+<span class="cmt"># Seleziona il sito → URL Rewrite → Add Rule → Reverse Proxy</span>
+Server name: localhost:5100
+<span class="cmt"># Abilita SSL Offloading → OK</span>
+
+<span class="cmt"># web.config generato automaticamente</span></pre>
+    <pre><span class="str">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;configuration&gt;
+  &lt;system.webServer&gt;
+    &lt;rewrite&gt;
+      &lt;rules&gt;
+        &lt;rule name="ReverseProxy" stopProcessing="true"&gt;
+          &lt;match url="(.*)" /&gt;
+          &lt;action type="Rewrite" url="http://localhost:5100/{R:1}" /&gt;
+        &lt;/rule&gt;
+      &lt;/rules&gt;
+    &lt;/rewrite&gt;
+  &lt;/system.webServer&gt;
+&lt;/configuration&gt;</span></pre>
+
+    <pre><span class="cmt"># Verifica reverse proxy</span>
+curl -v http://localhost:8081
+<span class="cmt"># Risposta identica a localhost:5100 — IIS sta agendo da proxy</span></pre>
+
+    <pre><span class="cmt"># B5 — Cloudflare: aggiungi Public Hostname</span>
+Subdomain: demo-mia-app
+Domain:    pm-softwareautomation.com
+Type:      HTTP
+URL:       http://localhost:8081   <span class="cmt">← porta IIS, non Docker!</span>
+
+<span class="cmt"># config.yml aggiornato (aggiungi PRIMA della riga http_status:404)</span>
+ingress:
+  - hostname: testsito.pm-softwareautomation.com
+    service: http://localhost:8080
+  - hostname: demo-mia-app.pm-softwareautomation.com
+    service: http://localhost:8081   <span class="cmt">← IIS proxy verso Docker</span>
+  - service: http_status:404
+
+Restart-Service cloudflared</pre>
+  </div>
+</div>
+
+<!-- Avvio automatico -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Avvio Automatico al Riavvio del ProDesk</span><span class="card-tag tag-pattern">startup</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Componente</th><th>Configurazione</th></tr>
+      <tr><td>Docker Desktop</td><td>Settings → General → <em>Start Docker Desktop when you log in</em></td></tr>
+      <tr><td>Container Docker</td><td><code>restart: unless-stopped</code> in docker-compose.yml</td></tr>
+      <tr><td>cloudflared</td><td>Già installato come servizio Windows — si avvia automaticamente</td></tr>
+      <tr><td>IIS</td><td>Si avvia automaticamente con Windows per default</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Troubleshooting -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Troubleshooting — Errori Comuni</span><span class="card-tag tag-component">debug</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Sintomo</th><th>Causa e Soluzione</th></tr>
+      <tr><td>DNS_PROBE_FINISHED_NXDOMAIN</td><td>Record DNS non propagato. Verificare con <code>Resolve-DnsName &lt;host&gt; -Server 1.1.1.1</code></td></tr>
+      <tr><td>400 Invalid Hostname</td><td>Binding IIS ha Host name specifico → impostare a vuoto. O rimuovere <code>httpHostHeader</code> dal config.yml</td></tr>
+      <tr><td>Tunnel Status: Down</td><td>cloudflared non in esecuzione. Eseguire <code>Restart-Service cloudflared</code></td></tr>
+      <tr><td>Solo IPv6, nessun IPv4</td><td>Record DNS non è Proxied (nuvoletta grigia) → cambiarlo in Proxied su Cloudflare</td></tr>
+      <tr><td>IIS binding su 127.0.0.1</td><td>Tunnel non riesce a connettersi → cambiare binding da 127.0.0.1 a <em>All Unassigned (*)</em></td></tr>
+    </table>
+    <pre><span class="cmt"># Comandi diagnostica rapida (PowerShell)</span>
+netstat -ano | findstr :8080         <span class="cmt"># porta in ascolto?</span>
+Get-Service cloudflared              <span class="cmt"># servizio attivo?</span>
+ipconfig /flushdns                   <span class="cmt"># svuota cache DNS</span>
+Resolve-DnsName &lt;host&gt; -Server 1.1.1.1
+curl -v http://localhost:&lt;porta&gt;
+docker compose ps                    <span class="cmt"># container attivi?</span>
+docker compose logs --tail=50</pre>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
