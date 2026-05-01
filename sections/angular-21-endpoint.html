@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Angular 21 — Chiamare un Endpoint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="section-content">
+
+<div class="section-header">
+  <div class="section-icon icon-blue">🌐</div>
+  <div>
+    <div class="section-title">Angular 21 — Chiamare un Endpoint</div>
+    <div class="section-desc">Service con Observable, gestione loading/errore, finalize, ChangeDetectorRef</div>
+  </div>
+</div>
+
+<!-- Sintesi -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Sintesi — Regola Mentale</span><span class="card-tag tag-rule">quick ref</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// Service    → ritorna sempre Observable, mai Promise</span>
+<span class="cmt">// Componente → subscribe() + finalize() + cdr.detectChanges()</span>
+<span class="cmt">// Mai usare firstValueFrom() / async-await con HttpClient</span></pre>
+    <div class="info-box">
+      <div class="info-title">Perché no async/await?</div>
+      <div class="rule-text">I callback di <code>Promise</code> girano fuori dalla zona Angular: la proprietà cambia in memoria, ma il DOM non si aggiorna. Con <code>finalize()</code> + <code>cdr.detectChanges()</code> sei tu a controllare esplicitamente il re-render.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 1. Service -->
+<div class="card">
+  <div class="card-header"><span class="card-title">1. Service — ritorna Observable, mai Promise</span><span class="card-tag tag-service">service</span></div>
+  <div class="card-body">
+    <pre><span class="kw">import</span> { <span class="cls">HttpClient</span> } <span class="kw">from</span> <span class="str">"@angular/common/http"</span>;
+<span class="kw">import</span> { <span class="cls">Injectable</span> } <span class="kw">from</span> <span class="str">"@angular/core"</span>;
+<span class="kw">import</span> { <span class="cls">Observable</span>, timeout } <span class="kw">from</span> <span class="str">"rxjs"</span>;
+
+@<span class="cls">Injectable</span>({ providedIn: <span class="str">"root"</span> })
+<span class="kw">export class</span> <span class="cls">MioService</span> {
+  <span class="fn">constructor</span>(<span class="kw">private</span> http: <span class="cls">HttpClient</span>) {}
+
+  <span class="fn">getDati</span>(): <span class="cls">Observable</span>&lt;<span class="typ">MioDato</span>[]&gt; {
+    <span class="kw">return this</span>.http
+      .<span class="fn">get</span>&lt;<span class="typ">MioDato</span>[]&gt;(<span class="str">"http://server/api/dati"</span>)
+      .<span class="fn">pipe</span>(<span class="fn">timeout</span>(<span class="num">8000</span>));   <span class="cmt">// sempre: evita che rimanga in pending</span>
+  }
+}</pre>
+  </div>
+</div>
+
+<!-- 2. Componente -->
+<div class="card">
+  <div class="card-header"><span class="card-title">2. Componente — 4 ingredienti</span><span class="card-tag tag-component">componente</span></div>
+  <div class="card-body">
+    <pre><span class="kw">import</span> { <span class="cls">ChangeDetectorRef</span>, <span class="cls">Component</span> } <span class="kw">from</span> <span class="str">"@angular/core"</span>;
+<span class="kw">import</span> { <span class="cls">Subscription</span> } <span class="kw">from</span> <span class="str">"rxjs"</span>;
+<span class="kw">import</span> { <span class="fn">finalize</span> } <span class="kw">from</span> <span class="str">"rxjs/operators"</span>;
+
+@<span class="cls">Component</span>({ ... })
+<span class="kw">export class</span> <span class="cls">MioComponent</span> {
+  isBusy = <span class="kw">false</span>;
+  dati: <span class="typ">MioDato</span>[] = [];
+  errore = <span class="str">""</span>;
+
+  <span class="kw">private</span> sub?: <span class="cls">Subscription</span>;        <span class="cmt">// ① per fare unsubscribe</span>
+
+  <span class="fn">constructor</span>(
+    <span class="kw">private</span> svc: <span class="cls">MioService</span>,
+    <span class="kw">private</span> cdr: <span class="cls">ChangeDetectorRef</span>,  <span class="cmt">// ② forza il re-render</span>
+  ) {}
+
+  <span class="fn">ngOnDestroy</span>() {
+    <span class="kw">this</span>.sub?.<span class="fn">unsubscribe</span>();          <span class="cmt">// ③ pulizia se l'utente naviga via</span>
+  }
+
+  <span class="fn">carica</span>() {
+    <span class="kw">this</span>.isBusy = <span class="kw">true</span>;
+    <span class="kw">this</span>.errore = <span class="str">""</span>;
+
+    <span class="kw">this</span>.sub = <span class="kw">this</span>.svc.<span class="fn">getDati</span>()
+      .<span class="fn">pipe</span>(
+        <span class="fn">finalize</span>(() =&gt; {              <span class="cmt">// ④ equivalente di finally — gira sempre</span>
+          <span class="kw">this</span>.isBusy = <span class="kw">false</span>;
+          <span class="kw">this</span>.cdr.<span class="fn">detectChanges</span>();  <span class="cmt">// ⑤ forza Angular a vedere i cambiamenti</span>
+        }),
+      )
+      .<span class="fn">subscribe</span>({
+        next:  (dati) =&gt; (<span class="kw">this</span>.dati   = dati),
+        error: (err)  =&gt; (<span class="kw">this</span>.errore = <span class="str">"Errore: "</span> + err.message),
+      });
+  }
+}</pre>
+  </div>
+</div>
+
+<!-- Schema flusso -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Schema del Flusso</span><span class="card-tag tag-pattern">flusso</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">click → isBusy=true</span>
+<span class="cmt">          ↓</span>
+<span class="cmt">        subscribe()</span>
+<span class="cmt">          ↓</span>
+<span class="cmt">     risposta arriva</span>
+<span class="cmt">     ┌──────────────────────────────────┐</span>
+<span class="cmt">     │ next:  aggiorna dati / feedback  │</span>
+<span class="cmt">     │ error: aggiorna errore           │</span>
+<span class="cmt">     └──────────────────────────────────┘</span>
+<span class="cmt">          ↓</span>
+<span class="cmt">     finalize() — gira sempre</span>
+<span class="cmt">       isBusy = false</span>
+<span class="cmt">       cdr.detectChanges()  ← dice ad Angular "rileggimi"</span></pre>
+  </div>
+</div>
+
+<!-- Perché non async/await -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Perché NON usare async/await?</span><span class="card-tag tag-rule">anti-pattern</span></div>
+  <div class="card-body">
+    <pre><span class="cmt">// ❌ NON fare così in Angular 21</span>
+<span class="kw">async</span> <span class="fn">carica</span>() {
+  <span class="kw">this</span>.isBusy = <span class="kw">true</span>;
+  <span class="kw">try</span> {
+    <span class="kw">this</span>.dati = <span class="kw">await</span> <span class="fn">firstValueFrom</span>(<span class="kw">this</span>.svc.<span class="fn">getDati</span>());
+  } <span class="kw">finally</span> {
+    <span class="kw">this</span>.isBusy = <span class="kw">false</span>;  <span class="cmt">// viene eseguito, ma Angular non lo vede</span>
+  }
+}</pre>
+    <div class="rule-box">
+      <div class="rule-title">Il problema</div>
+      <div class="rule-text">Il <code>finally</code> viene eseguito fuori dalla zona Angular → la proprietà cambia in memoria, ma il DOM non si aggiorna. Con <code>cdr.detectChanges()</code> nel <code>finalize</code> di un Observable sei tu a controllare esplicitamente quando Angular ri-renderizza.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Checklist -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Checklist Rapida</span><span class="card-tag tag-action">checklist</span></div>
+  <div class="card-body">
+    <table>
+      <tr><th>Cosa</th><th>Come</th></tr>
+      <tr><td>Timeout sul request</td><td><code>.pipe(timeout(8000))</code> nel service</td></tr>
+      <tr><td>Stato "loading"</td><td><code>finalize(() =&gt; { isBusy=false; cdr.detectChanges(); })</code></td></tr>
+      <tr><td>Pulizia memoria</td><td><code>private sub?: Subscription</code> + <code>ngOnDestroy</code></td></tr>
+      <tr><td>Niente async/await con HTTP</td><td>usa solo <code>subscribe()</code></td></tr>
+    </table>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
