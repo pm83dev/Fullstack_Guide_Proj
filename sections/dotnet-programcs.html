@@ -1,31 +1,74 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="it">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>dotnet-programcs</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
-<div id="section-content">
-<div class="section-header">
-  <div class="section-icon icon-blue">⚙️</div>
-  <div>
-    <div class="section-title">Program.cs — ASP.NET Core</div>
-    <div class="section-desc">Configurazione completa: servizi, middleware pipeline, appsettings.json</div>
-  </div>
-</div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>dotnet-programcs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="section-content">
+      <div class="section-header">
+        <div class="section-icon icon-blue">⚙️</div>
+        <div>
+          <div class="section-title">Program.cs — ASP.NET Core</div>
+          <div class="section-desc">
+            Configurazione completa: servizi, middleware pipeline,
+            appsettings.json
+          </div>
+        </div>
+      </div>
 
-<div class="rule-box">
-  <div class="rule-title">⚠️ Ordine middleware critico</div>
-  <div class="rule-text">La sequenza corretta è: <code>UseHttpsRedirection → UseCors → UseAuthentication → UseAuthorization → MapControllers</code>. Invertire <code>UseAuthentication</code> e <code>UseAuthorization</code> causa errori 401 inspiegabili.</div>
-</div>
+      <div class="rule-box">
+        <div class="rule-title">⚠️ Ordine middleware critico</div>
+        <div class="rule-text">
+          La sequenza corretta è:
+          <code
+            >UseHttpsRedirection → UseCors → UseAuthentication →
+            UseAuthorization → MapControllers</code
+          >. Invertire <code>UseAuthentication</code> e
+          <code>UseAuthorization</code> causa errori 401 inspiegabili.
+        </div>
+      </div>
 
-<div class="card">
-  <div class="card-header"><span class="card-title">Program.cs — Scheletro completo</span><span class="card-tag tag-pattern">C#</span></div>
-  <pre><span class="kw">var</span> builder = WebApplication.<span class="fn">CreateBuilder</span>(args);
+      <div class="rule-box" style="border-left-color: #e67e22">
+        <div class="rule-title">
+          🔒 UseHttpsRedirection — attenzione con reverse proxy / health check
+        </div>
+        <div class="rule-text">
+          Se il server espone più porte (es. <strong>8080</strong> per health
+          check interni o reverse proxy che già gestisce TLS),
+          <code>UseHttpsRedirection</code> non deve girare su quella porta,
+          altrimenti redirige in loop o blocca i check.<br />
+          <strong
+            >Soluzione: condizionare il middleware con
+            <code>UseWhen</code>:</strong
+          >
+        </div>
+        <pre
+          style="margin-top: 8px"
+        ><span class="fn">app</span>.<span class="fn">UseWhen</span>(
+    ctx =&gt; ctx.Connection.LocalPort != <span class="str">8080</span>,
+    appBuilder =&gt; appBuilder.<span class="fn">UseHttpsRedirection</span>()
+);</pre>
+        <div class="rule-text" style="margin-top: 6px">
+          In questo modo HTTPS redirect è attivo su tutte le porte
+          <em>tranne</em> la 8080, senza duplicare la pipeline. Utile in
+          ambienti Docker, Azure App Service o dietro NGINX/Traefik.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Program.cs — Scheletro completo</span
+          ><span class="card-tag tag-pattern">C#</span>
+        </div>
+        <pre><span class="kw">var</span> builder = WebApplication.<span class="fn">CreateBuilder</span>(args);
 
 <span class="cmt">// ─── Servizi ──────────────────────────────────────────</span>
 builder.Services.<span class="fn">AddControllers</span>();
@@ -67,22 +110,53 @@ app.<span class="fn">UseAuthentication</span>();     <span class="cmt">// ← PR
 app.<span class="fn">UseAuthorization</span>();
 app.<span class="fn">MapControllers</span>();
 app.<span class="fn">Run</span>();</pre>
-</div>
+      </div>
 
-<div class="card">
-  <div class="card-header"><span class="card-title">Flusso builder / app</span></div>
-  <div class="flow">
-    <div class="flow-row"><span class="flow-node fn-blue">builder.Services.Add*()</span><span class="flow-arrow">→</span><span class="flow-label">Registra servizi nella DI</span></div>
-    <div class="flow-row"><span class="flow-node fn-orange">builder.Build()</span><span class="flow-arrow">→</span><span class="flow-label">Punto di separazione — dopo: niente più Add*()</span></div>
-    <div class="flow-row"><span class="flow-node fn-purple">app.Use*()</span><span class="flow-arrow">→</span><span class="flow-label">Configura pipeline middleware (ordine obbligatorio)</span></div>
-    <div class="flow-row"><span class="flow-node fn-green">app.Map*()</span><span class="flow-arrow">→</span><span class="flow-label">Mappa endpoint (controllers, minimal API)</span></div>
-    <div class="flow-row"><span class="flow-node fn-red">app.Run()</span><span class="flow-arrow">→</span><span class="flow-label">Avvia il server HTTP</span></div>
-  </div>
-</div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Flusso builder / app</span>
+        </div>
+        <div class="flow">
+          <div class="flow-row">
+            <span class="flow-node fn-blue">builder.Services.Add*()</span
+            ><span class="flow-arrow">→</span
+            ><span class="flow-label">Registra servizi nella DI</span>
+          </div>
+          <div class="flow-row">
+            <span class="flow-node fn-orange">builder.Build()</span
+            ><span class="flow-arrow">→</span
+            ><span class="flow-label"
+              >Punto di separazione — dopo: niente più Add*()</span
+            >
+          </div>
+          <div class="flow-row">
+            <span class="flow-node fn-purple">app.Use*()</span
+            ><span class="flow-arrow">→</span
+            ><span class="flow-label"
+              >Configura pipeline middleware (ordine obbligatorio)</span
+            >
+          </div>
+          <div class="flow-row">
+            <span class="flow-node fn-green">app.Map*()</span
+            ><span class="flow-arrow">→</span
+            ><span class="flow-label"
+              >Mappa endpoint (controllers, minimal API)</span
+            >
+          </div>
+          <div class="flow-row">
+            <span class="flow-node fn-red">app.Run()</span
+            ><span class="flow-arrow">→</span
+            ><span class="flow-label">Avvia il server HTTP</span>
+          </div>
+        </div>
+      </div>
 
-<div class="card">
-  <div class="card-header"><span class="card-title">appsettings.json — sezioni comuni</span><span class="card-tag tag-action">JSON</span></div>
-  <pre>{
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">appsettings.json — sezioni comuni</span
+          ><span class="card-tag tag-action">JSON</span>
+        </div>
+        <pre>{
   <span class="prop">"ConnectionStrings"</span>: {
     <span class="prop">"Default"</span>: <span class="str">"Server=.;Database=MyDb;Trusted_Connection=True;TrustServerCertificate=True"</span>
   },
@@ -92,14 +166,21 @@ app.<span class="fn">Run</span>();</pre>
   <span class="prop">"Logging"</span>: { <span class="prop">"LogLevel"</span>: { <span class="prop">"Default"</span>: <span class="str">"Information"</span> } },
   <span class="prop">"AllowedHosts"</span>: <span class="str">"*"</span>
 }</pre>
-  <div class="card-body">
-    <p><strong>⚠️ Non committare mai segreti reali</strong> (chiavi JWT, password DB) in <code>appsettings.json</code>. In sviluppo usa <code>dotnet user-secrets</code>, in produzione usa variabili d'ambiente o Azure Key Vault.</p>
-  </div>
-</div>
+        <div class="card-body">
+          <p>
+            <strong>⚠️ Non committare mai segreti reali</strong> (chiavi JWT,
+            password DB) in <code>appsettings.json</code>. In sviluppo usa
+            <code>dotnet user-secrets</code>, in produzione usa variabili
+            d'ambiente o Azure Key Vault.
+          </p>
+        </div>
+      </div>
 
-<div class="card">
-  <div class="card-header"><span class="card-title">Pacchetti NuGet essenziali</span></div>
-  <pre><span class="cmt"># Entity Framework Core (SQL Server)</span>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Pacchetti NuGet essenziali</span>
+        </div>
+        <pre><span class="cmt"># Entity Framework Core (SQL Server)</span>
 dotnet add MyProject.Infrastructure package Microsoft.EntityFrameworkCore.SqlServer
 dotnet add MyProject.Infrastructure package Microsoft.EntityFrameworkCore.Tools
 
@@ -111,10 +192,14 @@ dotnet add MyProject.Api package Swashbuckle.AspNetCore
 
 <span class="cmt"># AutoMapper (opzionale)</span>
 dotnet add MyProject.Api package AutoMapper.Extensions.Microsoft.DependencyInjection</pre>
-  <div class="card-body">
-    <p>⚠️ <code>EntityFrameworkCore.Tools</code> va su <strong>Infrastructure</strong>, non su Api. Se installato nel posto sbagliato, <code>dotnet ef</code> non trova il DbContext.</p>
-  </div>
-</div>
-</div>
-</body>
+        <div class="card-body">
+          <p>
+            ⚠️ <code>EntityFrameworkCore.Tools</code> va su
+            <strong>Infrastructure</strong>, non su Api. Se installato nel posto
+            sbagliato, <code>dotnet ef</code> non trova il DbContext.
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
 </html>
