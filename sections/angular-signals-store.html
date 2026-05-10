@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Angular Signals — Store Pattern Completo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="section-content">
+      <div class="section-header">
+        <div class="section-icon icon-green">⚡</div>
+        <div>
+          <div class="section-title">
+            Angular Signals — Store Pattern Completo
+          </div>
+          <div class="section-desc">
+            Model · Service-Store · Component — gestione stato reattiva senza
+            NGXS, senza Observable
+          </div>
+        </div>
+      </div>
+
+      <!-- Flusso -->
+      <div class="flow">
+        <div class="flow-row">
+          <span class="flow-node fn-red">Component</span
+          ><span class="flow-arrow">→</span
+          ><span class="flow-label"
+            >chiama direttamente store.loadOfferte('JOB-001')</span
+          >
+        </div>
+        <div class="flow-row" style="margin-left: 20px">
+          <span class="flow-arrow">↓</span>
+        </div>
+        <div class="flow-row">
+          <span class="flow-node fn-green">VenditaStore</span
+          ><span class="flow-arrow">→</span
+          ><span class="flow-label">HTTP GET → tap → _offerte.set(data)</span>
+        </div>
+        <div class="flow-row" style="margin-left: 20px">
+          <span class="flow-arrow">↓</span>
+        </div>
+        <div class="flow-row">
+          <span class="flow-node fn-purple">Signal</span
+          ><span class="flow-arrow">→</span
+          ><span class="flow-label"
+            >computed() ricalcola totaleProgetto automaticamente</span
+          >
+        </div>
+        <div class="flow-row" style="margin-left: 20px">
+          <span class="flow-arrow">↓</span>
+        </div>
+        <div class="flow-row">
+          <span class="flow-node fn-red">Template</span
+          ><span class="flow-arrow">→</span
+          ><span class="flow-label"
+            >store.offerte() — Angular aggiorna solo il DOM interessato</span
+          >
+        </div>
+      </div>
+
+      <!-- Modello -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">1 — Il Modello (Interfaces)</span
+          ><span class="card-tag tag-action">model</span>
+        </div>
+        <div class="card-body">
+          <p>
+            Definiamo la gerarchia dei dati. I tipi viaggiano identici tra
+            frontend e backend.
+          </p>
+          <pre><span class="cmt">// vendita.model.ts</span>
+<span class="kw">export interface</span> <span class="cls">Sal</span> {
+  id: <span class="typ">number</span>;
+  importo: <span class="typ">number</span>;
+  date: <span class="typ">string</span>;
+}
+
+<span class="kw">export interface</span> <span class="cls">Ordine</span> {
+  id: <span class="typ">number</span>;
+  number: <span class="typ">string</span>;
+  importo: <span class="typ">number</span>;
+  listaSal: <span class="cls">Sal</span>[];
+}
+
+<span class="kw">export interface</span> <span class="cls">Offerta</span> {
+  id: <span class="typ">number</span>;
+  number: <span class="typ">string</span>;
+  stato: <span class="typ">number</span>;
+  ordini: <span class="cls">Ordine</span>[];
+}</pre>
+        </div>
+      </div>
+
+      <!-- Store / Service -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">2 — Lo Store / Service</span
+          ><span class="card-tag tag-service">service</span>
+        </div>
+        <div class="card-body">
+          <p>
+            Tre sezioni distinte dentro un unico <code>@Injectable</code>:
+            <strong>STATE</strong> (signal privati scrivibili),
+            <strong>SELECTORS</strong> (signal pubblici in sola lettura) e
+            <strong>ACTIONS</strong> (metodi che modificano lo stato).
+          </p>
+          <pre><span class="cmt">// vendita.store.ts</span>
+<span class="kw">import</span> { <span class="cls">Injectable</span>, signal, computed, inject } <span class="kw">from</span> <span class="str">'@angular/core'</span>;
+<span class="kw">import</span> { <span class="cls">HttpClient</span> } <span class="kw">from</span> <span class="str">'@angular/common/http'</span>;
+<span class="kw">import</span> { tap } <span class="kw">from</span> <span class="str">'rxjs'</span>;
+<span class="kw">import</span> { <span class="cls">Offerta</span> } <span class="kw">from</span> <span class="str">'./vendita.model'</span>;
+
+<span class="dec">@Injectable</span>({ providedIn: <span class="str">'root'</span> })
+<span class="kw">export class</span> <span class="cls">VenditaStore</span> {
+  <span class="kw">private</span> http = <span class="fn">inject</span>(<span class="cls">HttpClient</span>);
+
+  <span class="cmt">// --- STATE (signal privati scrivibili) ---</span>
+  <span class="kw">private</span> _offerte = <span class="fn">signal</span>&lt;<span class="cls">Offerta</span>[]&gt;([]);
+  <span class="kw">private</span> _loading = <span class="fn">signal</span>&lt;<span class="typ">boolean</span>&gt;(<span class="kw">false</span>);
+  <span class="kw">private</span> _error   = <span class="fn">signal</span>&lt;<span class="typ">string | null</span>&gt;(<span class="kw">null</span>);
+
+  <span class="cmt">// --- SELECTORS (pubblici, in sola lettura) ---</span>
+  <span class="kw">readonly</span> offerte = <span class="kw">this</span>._offerte.<span class="fn">asReadonly</span>();
+  <span class="kw">readonly</span> loading = <span class="kw">this</span>._loading.<span class="fn">asReadonly</span>();
+  <span class="kw">readonly</span> error   = <span class="kw">this</span>._error.<span class="fn">asReadonly</span>();
+
+  <span class="cmt">// --- COMPUTED (stato derivato, ricalcolo automatico) ---</span>
+  <span class="kw">readonly</span> totaleProgetto = <span class="fn">computed</span>(() =>
+    <span class="kw">this</span>._offerte().<span class="fn">reduce</span>((acc, off) => acc + (off.ordini[<span class="acc">0</span>]?.importo || <span class="acc">0</span>), <span class="acc">0</span>)
+  );
+
+  <span class="cmt">// --- ACTIONS ---</span>
+  <span class="fn">loadOfferte</span>(jobId: <span class="typ">string</span>) {
+    <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="kw">true</span>);
+    <span class="kw">this</span>._error.<span class="fn">set</span>(<span class="kw">null</span>);
+
+    <span class="kw">this</span>.http.<span class="fn">get</span>&lt;<span class="cls">Offerta</span>[]&gt;(<span class="str">`/api/jobs/${jobId}/vendite`</span>)
+      .<span class="fn">pipe</span>(<span class="fn">tap</span>(data => <span class="kw">this</span>._offerte.<span class="fn">set</span>(data)))
+      .<span class="fn">subscribe</span>({
+        error:    (err) => <span class="kw">this</span>._error.<span class="fn">set</span>(<span class="str">'Errore nel caricamento dati'</span>),
+        complete: ()    => <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="kw">false</span>)
+      });
+  }
+
+  <span class="fn">updateOffertaStatus</span>(id: <span class="typ">number</span>, nuovoStato: <span class="typ">number</span>) {
+    <span class="kw">this</span>._offerte.<span class="fn">update</span>(list =>
+      list.<span class="fn">map</span>(o => o.id === id ? { ...o, stato: nuovoStato } : o)
+    );
+  }
+}</pre>
+          <div class="info-box">
+            <div class="info-title">asReadonly() — perché usarlo</div>
+            <div class="rule-text">
+              Esporre il signal con <strong>asReadonly()</strong> impedisce al
+              componente di chiamare <code>.set()</code> o
+              <code>.update()</code> direttamente, forzando l'uso dei metodi
+              action. È l'equivalente Signals di un getter NGXS.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Componente -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">3 — Il Componente</span
+          ><span class="card-tag tag-component">component</span>
+        </div>
+        <div class="card-body">
+          <p>
+            Il componente è snello: inietta lo store, chiama l'azione in
+            <code>ngOnInit</code> e legge i segnali nel template.
+          </p>
+          <pre><span class="cmt">// vendita.component.ts</span>
+<span class="kw">import</span> { <span class="cls">Component</span>, <span class="cls">OnInit</span>, inject } <span class="kw">from</span> <span class="str">'@angular/core'</span>;
+<span class="kw">import</span> { <span class="cls">CommonModule</span> } <span class="kw">from</span> <span class="str">'@angular/common'</span>;
+<span class="kw">import</span> { <span class="cls">VenditaStore</span> } <span class="kw">from</span> <span class="str">'./vendita.store'</span>;
+
+<span class="dec">@Component</span>({
+  selector: <span class="str">'app-vendita-page'</span>,
+  standalone: <span class="kw">true</span>,
+  imports: [<span class="cls">CommonModule</span>],
+  template: <span class="str">`
+    &lt;div class="container mt-4"&gt;
+      &lt;h2&gt;Monitoraggio Vendite&lt;/h2&gt;
+
+      &lt;div *ngIf="store.loading()" class="spinner-border text-danger"&gt;&lt;/div&gt;
+      &lt;div *ngIf="store.error()" class="alert alert-danger"&gt;{{ store.error() }}&lt;/div&gt;
+
+      &lt;div class="card mb-3 bg-dark text-white" *ngIf="!store.loading()"&gt;
+        &lt;div class="card-body"&gt;
+          Totale Commessa: {{ store.totaleProgetto() | currency:'EUR' }}
+        &lt;/div&gt;
+      &lt;/div&gt;
+
+      &lt;table class="table table-bordered align-middle"&gt;
+        &lt;thead class="table-light"&gt;
+          &lt;tr&gt;
+            &lt;th&gt;Offerta&lt;/th&gt;&lt;th&gt;SAL / Stato&lt;/th&gt;&lt;th&gt;Azioni&lt;/th&gt;
+          &lt;/tr&gt;
+        &lt;/thead&gt;
+        &lt;tbody&gt;
+          &lt;tr *ngFor="let off of store.offerte()"&gt;
+            &lt;td&gt;&lt;strong&gt;{{ off.number }}&lt;/strong&gt;&lt;/td&gt;
+            &lt;td&gt;
+              &lt;div *ngFor="let sal of off.ordini[0]?.listaSal" class="small border-bottom"&gt;
+                SAL del {{ sal.date }}: {{ sal.importo | currency:'EUR' }}
+              &lt;/div&gt;
+            &lt;/td&gt;
+            &lt;td&gt;
+              &lt;button class="btn btn-sm btn-outline-primary"
+                      (click)="store.updateOffertaStatus(off.id, 2)"&gt;
+                Accetta
+              &lt;/button&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+        &lt;/tbody&gt;
+      &lt;/table&gt;
+    &lt;/div&gt;
+  `</span>
+})
+<span class="kw">export class</span> <span class="cls">VenditaComponent</span> <span class="kw">implements</span> <span class="cls">OnInit</span> {
+  <span class="kw">readonly</span> store = <span class="fn">inject</span>(<span class="cls">VenditaStore</span>);
+
+  <span class="fn">ngOnInit</span>() {
+    <span class="kw">this</span>.store.<span class="fn">loadOfferte</span>(<span class="str">'JOB-2024-001'</span>);
+  }
+}</pre>
+        </div>
+      </div>
+
+      <!-- Signals vs NGXS -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Signals vs NGXS — Confronto Pratico</span
+          ><span class="card-tag tag-state">confronto</span>
+        </div>
+        <div class="card-body">
+          <table>
+            <tr>
+              <th>Aspetto</th>
+              <th>NGXS</th>
+              <th>Signals</th>
+            </tr>
+            <tr>
+              <td>Chiamare un'azione</td>
+              <td><code>store.dispatch(new LoadOfferte(id))</code></td>
+              <td><code>store.loadOfferte(id)</code></td>
+            </tr>
+            <tr>
+              <td>Leggere lo stato nel template</td>
+              <td><code>offerte$ | async</code></td>
+              <td>
+                <code>store.offerte()</code> — le
+                <strong>parentesi</strong> leggono il valore corrente
+              </td>
+            </tr>
+            <tr>
+              <td>Stato derivato</td>
+              <td>Selector con <code>createSelector</code></td>
+              <td><code>computed(() => ...)</code> — ricalcolo automatico</td>
+            </tr>
+            <tr>
+              <td>Aggiornamento DOM</td>
+              <td>Zone.js rileva ogni cambiamento</td>
+              <td>
+                Angular aggiorna <em>solo</em> il nodo che dipende dal signal
+                cambiato
+              </td>
+            </tr>
+            <tr>
+              <td>File necessari</td>
+              <td>
+                <code>actions.ts</code> · <code>state.ts</code> ·
+                <code>selectors.ts</code>
+              </td>
+              <td>Un solo <code>vendita.store.ts</code></td>
+            </tr>
+          </table>
+          <div class="rule-box" style="margin-top: 12px">
+            <div class="rule-title">Le parentesi contano</div>
+            <div class="rule-text">
+              <code>store.offerte</code> è il signal (oggetto).
+              <code>store.offerte()</code> è il valore attuale (array). Nel
+              template Angular devi sempre usare le parentesi per "leggere" il
+              segnale; senza parentesi ottieni l'oggetto signal, non i dati.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
