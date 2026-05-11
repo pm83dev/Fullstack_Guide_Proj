@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Angular Signals — Store Pattern Completo</title>
+    <title>Angular Signals — Guida Completa</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
@@ -16,282 +16,699 @@
       <div class="section-header">
         <div class="section-icon icon-green">⚡</div>
         <div>
-          <div class="section-title">
-            Angular Signals — Store Pattern Completo
-          </div>
+          <div class="section-title">GUIDA COMPLETA: Angular Signals</div>
           <div class="section-desc">
-            Model · Service-Store · Component — gestione stato reattiva senza
-            NGXS, senza Observable
+            Signal · Computed · Effect · RxJS Interop · Inputs/Outputs · HTTP
+            Patterns · Best Practices · Migrazione
           </div>
         </div>
       </div>
 
-      <!-- Flusso -->
-      <div class="flow">
-        <div class="flow-row">
-          <span class="flow-node fn-red">Component</span
-          ><span class="flow-arrow">→</span
-          ><span class="flow-label"
-            >chiama direttamente store.loadOfferte('JOB-001')</span
-          >
-        </div>
-        <div class="flow-row" style="margin-left: 20px">
-          <span class="flow-arrow">↓</span>
-        </div>
-        <div class="flow-row">
-          <span class="flow-node fn-green">VenditaStore</span
-          ><span class="flow-arrow">→</span
-          ><span class="flow-label">HTTP GET → tap → _offerte.set(data)</span>
-        </div>
-        <div class="flow-row" style="margin-left: 20px">
-          <span class="flow-arrow">↓</span>
-        </div>
-        <div class="flow-row">
-          <span class="flow-node fn-purple">Signal</span
-          ><span class="flow-arrow">→</span
-          ><span class="flow-label"
-            >computed() ricalcola totaleProgetto automaticamente</span
-          >
-        </div>
-        <div class="flow-row" style="margin-left: 20px">
-          <span class="flow-arrow">↓</span>
-        </div>
-        <div class="flow-row">
-          <span class="flow-node fn-red">Template</span
-          ><span class="flow-arrow">→</span
-          ><span class="flow-label"
-            >store.offerte() — Angular aggiorna solo il DOM interessato</span
-          >
-        </div>
-      </div>
-
-      <!-- Modello -->
+      <!-- 1. Signal Base -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">1 — Il Modello (Interfaces)</span
-          ><span class="card-tag tag-action">model</span>
+          <span class="card-title">1 — Signal Base</span>
+          <span class="card-tag tag-action">signal</span>
         </div>
         <div class="card-body">
-          <p>
-            Definiamo la gerarchia dei dati. I tipi viaggiano identici tra
-            frontend e backend.
-          </p>
-          <pre><span class="cmt">// vendita.model.ts</span>
-<span class="kw">export interface</span> <span class="cls">Sal</span> {
-  id: <span class="typ">number</span>;
-  importo: <span class="typ">number</span>;
-  date: <span class="typ">string</span>;
+          <p><strong>Creazione e operazioni</strong></p>
+          <pre><span class="kw">import</span> { signal, <span class="cls">WritableSignal</span>, <span class="cls">Signal</span> } <span class="kw">from</span> <span class="str">'@angular/core'</span>;
+
+<span class="cmt">// WritableSignal: può essere modificato</span>
+<span class="kw">const</span> count: <span class="cls">WritableSignal</span>&lt;<span class="typ">number</span>&gt; = <span class="fn">signal</span>(<span class="acc">0</span>);
+
+count.<span class="fn">set</span>(<span class="acc">5</span>);                        <span class="cmt">// Imposta valore</span>
+count.<span class="fn">update</span>(n => n + <span class="acc">1</span>);           <span class="cmt">// Aggiorna basandosi sul valore precedente</span>
+count.<span class="fn">mutate</span>(arr => arr.<span class="fn">push</span>(<span class="acc">4</span>));  <span class="cmt">// Solo per array/oggetti</span>
+
+<span class="cmt">// Signal readonly: solo lettura (di solito da computed)</span>
+<span class="kw">const</span> doubled: <span class="cls">Signal</span>&lt;<span class="typ">number</span>&gt; = <span class="fn">computed</span>(() => <span class="fn">count</span>() * <span class="acc">2</span>);
+<span class="cmt">// doubled.set(10); ❌ Errore: readonly</span></pre>
+          <p style="margin-top: 12px"><strong>Writable vs Readonly</strong></p>
+          <pre><span class="kw">export class</span> <span class="cls">CounterService</span> {
+  <span class="kw">private</span> _count = <span class="fn">signal</span>(<span class="acc">0</span>);
+
+  <span class="cmt">// Public readonly - esponi solo lettura</span>
+  <span class="kw">readonly</span> count = <span class="kw">this</span>._count.<span class="fn">asReadonly</span>();
+
+  <span class="fn">increment</span>() {
+    <span class="kw">this</span>._count.<span class="fn">update</span>(n => n + <span class="acc">1</span>);
+  }
 }
 
-<span class="kw">export interface</span> <span class="cls">Ordine</span> {
-  id: <span class="typ">number</span>;
-  number: <span class="typ">string</span>;
-  importo: <span class="typ">number</span>;
-  listaSal: <span class="cls">Sal</span>[];
-}
+<span class="kw">export class</span> <span class="cls">MyComponent</span> {
+  service = <span class="fn">inject</span>(<span class="cls">CounterService</span>);
 
-<span class="kw">export interface</span> <span class="cls">Offerta</span> {
-  id: <span class="typ">number</span>;
-  number: <span class="typ">string</span>;
-  stato: <span class="typ">number</span>;
-  ordini: <span class="cls">Ordine</span>[];
+  <span class="fn">ngOnInit</span>() {
+    console.<span class="fn">log</span>(<span class="kw">this</span>.service.<span class="fn">count</span>()); <span class="cmt">// ✅ Leggi</span>
+    <span class="cmt">// this.service.count.set(5); ❌ Errore: readonly</span>
+    <span class="kw">this</span>.service.<span class="fn">increment</span>();           <span class="cmt">// ✅ Modifica tramite metodo</span>
+  }
 }</pre>
         </div>
       </div>
 
-      <!-- Store / Service -->
+      <!-- 2. Computed -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">2 — Lo Store / Service</span
-          ><span class="card-tag tag-service">service</span>
+          <span class="card-title">2 — Computed (valori derivati)</span>
+          <span class="card-tag tag-state">computed</span>
         </div>
         <div class="card-body">
           <p>
-            Tre sezioni distinte dentro un unico <code>@Injectable</code>:
-            <strong>STATE</strong> (signal privati scrivibili),
-            <strong>SELECTORS</strong> (signal pubblici in sola lettura) e
-            <strong>ACTIONS</strong> (metodi che modificano lo stato).
+            I computed sono <strong>lazy</strong>: si ricalcolano solo quando
+            vengono letti e solo se le dipendenze sono cambiate.
           </p>
-          <pre><span class="cmt">// vendita.store.ts</span>
-<span class="kw">import</span> { <span class="cls">Injectable</span>, signal, computed, inject } <span class="kw">from</span> <span class="str">'@angular/core'</span>;
-<span class="kw">import</span> { <span class="cls">HttpClient</span> } <span class="kw">from</span> <span class="str">'@angular/common/http'</span>;
-<span class="kw">import</span> { tap } <span class="kw">from</span> <span class="str">'rxjs'</span>;
-<span class="kw">import</span> { <span class="cls">Offerta</span> } <span class="kw">from</span> <span class="str">'./vendita.model'</span>;
+          <pre><span class="cmt">// Computed: valori derivati automatici</span>
+filteredProducts = <span class="fn">computed</span>(() => {
+  <span class="kw">const</span> search = <span class="kw">this</span>.<span class="fn">searchTerm</span>();
+  <span class="kw">const</span> min    = <span class="kw">this</span>.<span class="fn">minPrice</span>();
+  <span class="kw">return this</span>.products()
+    .<span class="fn">filter</span>(p => p.name.<span class="fn">includes</span>(search))
+    .<span class="fn">filter</span>(p => p.price >= min);
+});
 
-<span class="dec">@Injectable</span>({ providedIn: <span class="str">'root'</span> })
-<span class="kw">export class</span> <span class="cls">VenditaStore</span> {
-  <span class="kw">private</span> http = <span class="fn">inject</span>(<span class="cls">HttpClient</span>);
+<span class="cmt">// I computed sono LAZY: si ricalcolano solo quando vengono letti</span>
+totalPrice = <span class="fn">computed</span>(() => {
+  console.<span class="fn">log</span>(<span class="str">'Ricalcolo total'</span>); <span class="cmt">// Vedi quando si ricalcola</span>
+  <span class="kw">return this</span>.items().<span class="fn">reduce</span>((sum, i) => sum + i.price, <span class="acc">0</span>);
+});</pre>
+        </div>
+      </div>
 
-  <span class="cmt">// --- STATE (signal privati scrivibili) ---</span>
-  <span class="kw">private</span> _offerte = <span class="fn">signal</span>&lt;<span class="cls">Offerta</span>[]&gt;([]);
-  <span class="kw">private</span> _loading = <span class="fn">signal</span>&lt;<span class="typ">boolean</span>&gt;(<span class="kw">false</span>);
-  <span class="kw">private</span> _error   = <span class="fn">signal</span>&lt;<span class="typ">string | null</span>&gt;(<span class="kw">null</span>);
+      <!-- 3. Effect + untracked -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">3 — Effect + untracked()</span>
+          <span class="card-tag tag-service">effect</span>
+        </div>
+        <div class="card-body">
+          <p><strong>Effect standard</strong></p>
+          <pre><span class="fn">constructor</span>() {
+  <span class="fn">effect</span>(() => {
+    console.<span class="fn">log</span>(<span class="str">'Count:'</span>, <span class="kw">this</span>.<span class="fn">count</span>());
+    <span class="cmt">// Si esegue quando count cambia</span>
+  });
+}</pre>
+          <p style="margin-top: 12px">
+            <strong>untracked() — leggere senza creare dipendenza</strong>
+          </p>
+          <pre><span class="kw">import</span> { effect, untracked } <span class="kw">from</span> <span class="str">'@angular/core'</span>;
 
-  <span class="cmt">// --- SELECTORS (pubblici, in sola lettura) ---</span>
-  <span class="kw">readonly</span> offerte = <span class="kw">this</span>._offerte.<span class="fn">asReadonly</span>();
-  <span class="kw">readonly</span> loading = <span class="kw">this</span>._loading.<span class="fn">asReadonly</span>();
-  <span class="kw">readonly</span> error   = <span class="kw">this</span>._error.<span class="fn">asReadonly</span>();
+<span class="kw">export class</span> <span class="cls">LogComponent</span> {
+  count    = <span class="fn">signal</span>(<span class="acc">0</span>);
+  userName = <span class="fn">signal</span>(<span class="str">'Paolo'</span>);
 
-  <span class="cmt">// --- COMPUTED (stato derivato, ricalcolo automatico) ---</span>
-  <span class="kw">readonly</span> totaleProgetto = <span class="fn">computed</span>(() =>
-    <span class="kw">this</span>._offerte().<span class="fn">reduce</span>((acc, off) => acc + (off.ordini[<span class="acc">0</span>]?.importo || <span class="acc">0</span>), <span class="acc">0</span>)
-  );
+  <span class="fn">constructor</span>() {
+    <span class="fn">effect</span>(() => {
+      <span class="cmt">// count crea dipendenza → effect si ri-esegue quando cambia</span>
+      <span class="kw">const</span> currentCount = <span class="kw">this</span>.<span class="fn">count</span>();
 
-  <span class="cmt">// --- ACTIONS ---</span>
-  <span class="fn">loadOfferte</span>(jobId: <span class="typ">string</span>) {
-    <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="kw">true</span>);
-    <span class="kw">this</span>._error.<span class="fn">set</span>(<span class="kw">null</span>);
+      <span class="cmt">// userName NON crea dipendenza → effect NON si ri-esegue quando cambia</span>
+      <span class="kw">const</span> name = <span class="fn">untracked</span>(() => <span class="kw">this</span>.<span class="fn">userName</span>());
 
-    <span class="kw">this</span>.http.<span class="fn">get</span>&lt;<span class="cls">Offerta</span>[]&gt;(<span class="str">`/api/jobs/${jobId}/vendite`</span>)
-      .<span class="fn">pipe</span>(<span class="fn">tap</span>(data => <span class="kw">this</span>._offerte.<span class="fn">set</span>(data)))
-      .<span class="fn">subscribe</span>({
-        error:    (err) => <span class="kw">this</span>._error.<span class="fn">set</span>(<span class="str">'Errore nel caricamento dati'</span>),
-        complete: ()    => <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="kw">false</span>)
-      });
+      console.<span class="fn">log</span>(<span class="str">`${name}: count è ${currentCount}`</span>);
+    });
   }
-
-  <span class="fn">updateOffertaStatus</span>(id: <span class="typ">number</span>, nuovoStato: <span class="typ">number</span>) {
-    <span class="kw">this</span>._offerte.<span class="fn">update</span>(list =>
-      list.<span class="fn">map</span>(o => o.id === id ? { ...o, stato: nuovoStato } : o)
-    );
-  }
+  <span class="cmt">// count.set(1)         → effect si esegue  ✅</span>
+  <span class="cmt">// userName.set('Mario') → effect NON si esegue ✅</span>
 }</pre>
           <div class="info-box">
-            <div class="info-title">asReadonly() — perché usarlo</div>
+            <div class="info-title">Quando usare untracked</div>
             <div class="rule-text">
-              Esporre il signal con <strong>asReadonly()</strong> impedisce al
-              componente di chiamare <code>.set()</code> o
-              <code>.update()</code> direttamente, forzando l'uso dei metodi
-              action. È l'equivalente Signals di un getter NGXS.
+              Logging con context info che non dovrebbe triggerare l'effect ·
+              Accedere a configurazione statica dentro effect · Evitare
+              dipendenze circolari
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Componente -->
+      <!-- 4. RxJS Interop -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">3 — Il Componente</span
-          ><span class="card-tag tag-component">component</span>
+          <span class="card-title">4 — Interoperabilità con RxJS</span>
+          <span class="card-tag tag-modal">rxjs-interop</span>
+        </div>
+        <div class="card-body">
+          <p><strong>toSignal() — Observable → Signal</strong></p>
+          <pre><span class="kw">import</span> { toSignal } <span class="kw">from</span> <span class="str">'@angular/core/rxjs-interop'</span>;
+<span class="kw">import</span> { interval } <span class="kw">from</span> <span class="str">'rxjs'</span>;
+
+<span class="kw">export class</span> <span class="cls">TimerComponent</span> {
+  <span class="kw">private</span> http = <span class="fn">inject</span>(<span class="cls">HttpClient</span>);
+
+  <span class="cmt">// initialValue: valore iniziale mentre carica (signal type: T)</span>
+  users = <span class="fn">toSignal</span>(
+    <span class="kw">this</span>.http.<span class="fn">get</span>&lt;<span class="cls">User</span>[]&gt;(<span class="str">'/api/users'</span>),
+    { initialValue: [] <span class="kw">as</span> <span class="cls">User</span>[] }
+  );
+
+  <span class="cmt">// Con gestione errori</span>
+  usersOrError = <span class="fn">toSignal</span>(
+    <span class="kw">this</span>.http.<span class="fn">get</span>&lt;<span class="cls">User</span>[]&gt;(<span class="str">'/api/users'</span>).<span class="fn">pipe</span>(<span class="fn">catchError</span>(() => <span class="fn">of</span>([]))),
+    { initialValue: [] }
+  );
+
+  <span class="cmt">// Timer reattivo</span>
+  seconds = <span class="fn">toSignal</span>(<span class="fn">interval</span>(<span class="acc">1000</span>), { initialValue: <span class="acc">0</span> });
+
+  <span class="cmt">// requireSync: signal type T (no undefined) — errore se stream non emette subito</span>
+  config = <span class="fn">toSignal</span>(<span class="kw">this</span>.http.<span class="fn">get</span>&lt;<span class="cls">Config</span>&gt;(<span class="str">'/api/config'</span>), { requireSync: <span class="acc">true</span> });
+
+  <span class="cmt">// Nessuna opzione → signal type: T | undefined</span>
+}</pre>
+          <p style="margin-top: 12px">
+            <strong>toObservable() — Signal → Observable</strong>
+          </p>
+          <pre><span class="kw">import</span> { toObservable } <span class="kw">from</span> <span class="str">'@angular/core/rxjs-interop'</span>;
+<span class="kw">import</span> { debounceTime, switchMap } <span class="kw">from</span> <span class="str">'rxjs'</span>;
+
+<span class="kw">export class</span> <span class="cls">SearchComponent</span> {
+  <span class="kw">private</span> http = <span class="fn">inject</span>(<span class="cls">HttpClient</span>);
+  searchTerm = <span class="fn">signal</span>(<span class="str">''</span>);
+
+  <span class="cmt">// Converti signal in Observable per usare operatori RxJS</span>
+  searchResults$ = <span class="fn">toObservable</span>(<span class="kw">this</span>.searchTerm).<span class="fn">pipe</span>(
+    <span class="fn">debounceTime</span>(<span class="acc">300</span>),
+    <span class="fn">switchMap</span>(term => <span class="kw">this</span>.http.<span class="fn">get</span>(<span class="str">`/api/search?q=${term}`</span>))
+  );
+
+  <span class="cmt">// Poi riconverti in signal</span>
+  results = <span class="fn">toSignal</span>(<span class="kw">this</span>.searchResults$, { initialValue: [] });
+}</pre>
+          <div class="rule-box">
+            <div class="rule-title">
+              Pattern: Signal → Observable → RxJS → Signal
+            </div>
+            <div class="rule-text">
+              <pre
+                style="background: transparent; padding: 0; margin-top: 8px"
+              ><span class="kw">export class</span> <span class="cls">AutocompleteComponent</span> {
+  query = <span class="fn">signal</span>(<span class="str">''</span>);
+
+  suggestions = <span class="fn">toSignal</span>(
+    <span class="fn">toObservable</span>(<span class="kw">this</span>.query).<span class="fn">pipe</span>(
+      <span class="fn">debounceTime</span>(<span class="acc">300</span>),
+      <span class="fn">distinctUntilChanged</span>(),
+      <span class="fn">switchMap</span>(q => q ? <span class="kw">this</span>.http.<span class="fn">get</span>(<span class="str">`/api/suggest?q=${q}`</span>) : <span class="fn">of</span>([]))
+    ),
+    { initialValue: [] }
+  );
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Signal Inputs/Outputs -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"
+            >5 — Signal Inputs/Outputs (Angular 17.1+)</span
+          >
+          <span class="card-tag tag-component">component</span>
+        </div>
+        <div class="card-body">
+          <p><strong>Signal Inputs — passare dati al componente</strong></p>
+          <pre><span class="kw">import</span> { input, <span class="cls">InputSignal</span> } <span class="kw">from</span> <span class="str">'@angular/core'</span>;
+
+<span class="kw">export class</span> <span class="cls">UserCardComponent</span> {
+  userName = <span class="fn">input</span>&lt;<span class="typ">string</span>&gt;(<span class="str">''</span>);         <span class="cmt">// InputSignal&lt;string&gt;</span>
+  age      = <span class="fn">input</span>&lt;<span class="typ">number</span>&gt;(<span class="acc">0</span>);
+  userId   = <span class="fn">input.required</span>&lt;<span class="typ">number</span>&gt;(); <span class="cmt">// required — InputSignal&lt;number&gt;</span>
+
+  <span class="cmt">// Input con transform</span>
+  disabled = <span class="fn">input</span>(<span class="acc">false</span>, {
+    transform: (value: <span class="typ">boolean | string</span>) =>
+      <span class="kw">typeof</span> value === <span class="str">'string'</span> ? value === <span class="str">''</span> : value
+  });
+
+  <span class="cmt">// Computed basato su input — reattivo automaticamente</span>
+  displayName = <span class="fn">computed</span>(() => <span class="str">`${this.userName()} (${this.age()} anni)`</span>);
+
+  <span class="fn">constructor</span>() {
+    <span class="fn">effect</span>(() => console.<span class="fn">log</span>(<span class="str">'User:'</span>, <span class="kw">this</span>.<span class="fn">userName</span>(), <span class="kw">this</span>.<span class="fn">age</span>()));
+  }
+}
+<span class="cmt">// Nel parent: &lt;app-user-card [userName]="'Paolo'" [age]="35" [userId]="123" /&gt;</span></pre>
+          <div class="info-box" style="margin-top: 12px">
+            <div class="info-title">Vantaggi Signal Inputs</div>
+            <div class="rule-text">
+              Reattività automatica (no ngOnChanges) · Type-safe · Funzionano
+              con computed/effect · Immutabili (readonly)
+            </div>
+          </div>
+          <p style="margin-top: 12px">
+            <strong>Signal Outputs — emettere eventi</strong>
+          </p>
+          <pre><span class="kw">import</span> { output } <span class="kw">from</span> <span class="str">'@angular/core'</span>;
+
+<span class="kw">export class</span> <span class="cls">CounterComponent</span> {
+  count        = <span class="fn">signal</span>(<span class="acc">0</span>);
+  countChanged = <span class="fn">output</span>&lt;<span class="typ">number</span>&gt;(); <span class="cmt">// OutputEmitterRef&lt;number&gt;</span>
+
+  <span class="fn">increment</span>() {
+    <span class="kw">this</span>.count.<span class="fn">update</span>(n => n + <span class="acc">1</span>);
+    <span class="kw">this</span>.countChanged.<span class="fn">emit</span>(<span class="kw">this</span>.<span class="fn">count</span>());
+  }
+}
+<span class="cmt">// Nel parent: &lt;app-counter (countChanged)="onCountChanged($event)" /&gt;</span></pre>
+        </div>
+      </div>
+
+      <!-- 6. HTTP + Signal -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">6 — HTTP + Signal — Tutti i Pattern</span>
+          <span class="card-tag tag-service">http</span>
         </div>
         <div class="card-body">
           <p>
-            Il componente è snello: inietta lo store, chiama l'azione in
-            <code>ngOnInit</code> e legge i segnali nel template.
+            <strong>Pattern 1: State signals manuali ✅ raccomandato</strong>
           </p>
-          <pre><span class="cmt">// vendita.component.ts</span>
-<span class="kw">import</span> { <span class="cls">Component</span>, <span class="cls">OnInit</span>, inject } <span class="kw">from</span> <span class="str">'@angular/core'</span>;
-<span class="kw">import</span> { <span class="cls">CommonModule</span> } <span class="kw">from</span> <span class="str">'@angular/common'</span>;
-<span class="kw">import</span> { <span class="cls">VenditaStore</span> } <span class="kw">from</span> <span class="str">'./vendita.store'</span>;
+          <pre><span class="kw">export class</span> <span class="cls">ProductsComponent</span> {
+  <span class="kw">private</span> service = <span class="fn">inject</span>(<span class="cls">ProductsService</span>);
 
-<span class="dec">@Component</span>({
-  selector: <span class="str">'app-vendita-page'</span>,
-  standalone: <span class="kw">true</span>,
-  imports: [<span class="cls">CommonModule</span>],
-  template: <span class="str">`
-    &lt;div class="container mt-4"&gt;
-      &lt;h2&gt;Monitoraggio Vendite&lt;/h2&gt;
+  products = <span class="fn">signal</span>&lt;<span class="cls">Product</span>[]&gt;([]);
+  loading  = <span class="fn">signal</span>(<span class="acc">false</span>);
+  error    = <span class="fn">signal</span>&lt;<span class="typ">string | null</span>&gt;(<span class="kw">null</span>);
 
-      &lt;div *ngIf="store.loading()" class="spinner-border text-danger"&gt;&lt;/div&gt;
-      &lt;div *ngIf="store.error()" class="alert alert-danger"&gt;{{ store.error() }}&lt;/div&gt;
-
-      &lt;div class="card mb-3 bg-dark text-white" *ngIf="!store.loading()"&gt;
-        &lt;div class="card-body"&gt;
-          Totale Commessa: {{ store.totaleProgetto() | currency:'EUR' }}
-        &lt;/div&gt;
-      &lt;/div&gt;
-
-      &lt;table class="table table-bordered align-middle"&gt;
-        &lt;thead class="table-light"&gt;
-          &lt;tr&gt;
-            &lt;th&gt;Offerta&lt;/th&gt;&lt;th&gt;SAL / Stato&lt;/th&gt;&lt;th&gt;Azioni&lt;/th&gt;
-          &lt;/tr&gt;
-        &lt;/thead&gt;
-        &lt;tbody&gt;
-          &lt;tr *ngFor="let off of store.offerte()"&gt;
-            &lt;td&gt;&lt;strong&gt;{{ off.number }}&lt;/strong&gt;&lt;/td&gt;
-            &lt;td&gt;
-              &lt;div *ngFor="let sal of off.ordini[0]?.listaSal" class="small border-bottom"&gt;
-                SAL del {{ sal.date }}: {{ sal.importo | currency:'EUR' }}
-              &lt;/div&gt;
-            &lt;/td&gt;
-            &lt;td&gt;
-              &lt;button class="btn btn-sm btn-outline-primary"
-                      (click)="store.updateOffertaStatus(off.id, 2)"&gt;
-                Accetta
-              &lt;/button&gt;
-            &lt;/td&gt;
-          &lt;/tr&gt;
-        &lt;/tbody&gt;
-      &lt;/table&gt;
-    &lt;/div&gt;
-  `</span>
-})
-<span class="kw">export class</span> <span class="cls">VenditaComponent</span> <span class="kw">implements</span> <span class="cls">OnInit</span> {
-  <span class="kw">readonly</span> store = <span class="fn">inject</span>(<span class="cls">VenditaStore</span>);
-
-  <span class="fn">ngOnInit</span>() {
-    <span class="kw">this</span>.store.<span class="fn">loadOfferte</span>(<span class="str">'JOB-2024-001'</span>);
+  <span class="fn">loadProducts</span>() {
+    <span class="kw">this</span>.loading.<span class="fn">set</span>(<span class="acc">true</span>); <span class="kw">this</span>.error.<span class="fn">set</span>(<span class="kw">null</span>);
+    <span class="kw">this</span>.service.<span class="fn">getProducts</span>().<span class="fn">subscribe</span>({
+      next:  (data) => { <span class="kw">this</span>.products.<span class="fn">set</span>(data); <span class="kw">this</span>.loading.<span class="fn">set</span>(<span class="acc">false</span>); },
+      error: (err)  => { <span class="kw">this</span>.error.<span class="fn">set</span>(err.message); <span class="kw">this</span>.loading.<span class="fn">set</span>(<span class="acc">false</span>); }
+    });
   }
+}</pre>
+          <p style="margin-top: 12px">
+            <strong>Pattern 2: toSignal per chiamate immediate</strong>
+          </p>
+          <pre><span class="kw">export class</span> <span class="cls">ConfigComponent</span> {
+  <span class="kw">private</span> http = <span class="fn">inject</span>(<span class="cls">HttpClient</span>);
+  <span class="cmt">// Parte subito — appena il component si crea</span>
+  config = <span class="fn">toSignal</span>(<span class="kw">this</span>.http.<span class="fn">get</span>&lt;<span class="cls">Config</span>&gt;(<span class="str">'/api/config'</span>), { initialValue: <span class="kw">null</span> });
+}</pre>
+          <p style="margin-top: 12px">
+            <strong>Pattern 3: Effect per chiamate reattive</strong>
+          </p>
+          <pre><span class="kw">export class</span> <span class="cls">FilteredListComponent</span> {
+  <span class="kw">private</span> service = <span class="fn">inject</span>(<span class="cls">ProductService</span>);
+  categoryId = <span class="fn">signal</span>(<span class="acc">1</span>);
+  searchTerm = <span class="fn">signal</span>(<span class="str">''</span>);
+  products   = <span class="fn">signal</span>&lt;<span class="cls">Product</span>[]&gt;([]);
+  loading    = <span class="fn">signal</span>(<span class="acc">false</span>);
+
+  <span class="fn">constructor</span>() {
+    <span class="cmt">// Ricarica automaticamente quando cambiano i filtri</span>
+    <span class="fn">effect</span>(() => {
+      <span class="kw">const</span> cat    = <span class="kw">this</span>.<span class="fn">categoryId</span>();
+      <span class="kw">const</span> search = <span class="kw">this</span>.<span class="fn">searchTerm</span>();
+      <span class="kw">this</span>.loading.<span class="fn">set</span>(<span class="acc">true</span>);
+      <span class="kw">this</span>.service.<span class="fn">search</span>(cat, search).<span class="fn">subscribe</span>({
+        next: (data) => { <span class="kw">this</span>.products.<span class="fn">set</span>(data); <span class="kw">this</span>.loading.<span class="fn">set</span>(<span class="acc">false</span>); }
+      });
+    });
+  }
+}</pre>
+          <p style="margin-top: 12px">
+            <strong>Pattern 4: Signal + RxJS operators</strong>
+          </p>
+          <pre><span class="kw">export class</span> <span class="cls">SearchComponent</span> {
+  <span class="kw">private</span> http = <span class="fn">inject</span>(<span class="cls">HttpClient</span>);
+  searchTerm = <span class="fn">signal</span>(<span class="str">''</span>);
+
+  <span class="cmt">// Signal → Observable → debounce → HTTP → Signal</span>
+  results = <span class="fn">toSignal</span>(
+    <span class="fn">toObservable</span>(<span class="kw">this</span>.searchTerm).<span class="fn">pipe</span>(
+      <span class="fn">debounceTime</span>(<span class="acc">300</span>),
+      <span class="fn">distinctUntilChanged</span>(),
+      <span class="fn">switchMap</span>(term => term ? <span class="kw">this</span>.http.<span class="fn">get</span>(<span class="str">`/api/search?q=${term}`</span>) : <span class="fn">of</span>([]))
+    ),
+    { initialValue: [] }
+  );
 }</pre>
         </div>
       </div>
 
-      <!-- Signals vs NGXS -->
+      <!-- 7. Best Practices -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Signals vs NGXS — Confronto Pratico</span
-          ><span class="card-tag tag-state">confronto</span>
+          <span class="card-title">7 — Best Practices</span>
+          <span class="card-tag tag-rule">best practices</span>
+        </div>
+        <div class="card-body">
+          <p><strong>✅ Naming conventions</strong></p>
+          <pre><span class="cmt">// Signal: nomi semplici</span>
+count     = <span class="fn">signal</span>(<span class="acc">0</span>);
+userName  = <span class="fn">signal</span>(<span class="str">''</span>);
+isLoading = <span class="fn">signal</span>(<span class="acc">false</span>);
+
+<span class="cmt">// Computed: nomi descrittivi</span>
+filteredItems = <span class="fn">computed</span>(() => ...);
+totalPrice    = <span class="fn">computed</span>(() => ...);
+isFormValid   = <span class="fn">computed</span>(() => ...);
+
+<span class="cmt">// Observable (se usi RxJS): suffisso $</span>
+users$ = <span class="kw">this</span>.http.<span class="fn">get</span>&lt;<span class="cls">User</span>[]&gt;(...);</pre>
+          <p style="margin-top: 12px">
+            <strong>✅ Incapsulamento in services</strong>
+          </p>
+          <pre><span class="dec">@Injectable</span>({ providedIn: <span class="str">'root'</span> })
+<span class="kw">export class</span> <span class="cls">CartService</span> {
+  <span class="kw">private</span> http = <span class="fn">inject</span>(<span class="cls">HttpClient</span>);
+
+  <span class="kw">private</span> _items   = <span class="fn">signal</span>&lt;<span class="cls">CartItem</span>[]&gt;([]);
+  <span class="kw">private</span> _loading = <span class="fn">signal</span>(<span class="acc">false</span>);
+
+  <span class="kw">readonly</span> items   = <span class="kw">this</span>._items.<span class="fn">asReadonly</span>();
+  <span class="kw">readonly</span> loading = <span class="kw">this</span>._loading.<span class="fn">asReadonly</span>();
+  <span class="kw">readonly</span> total   = <span class="fn">computed</span>(() =>
+    <span class="kw">this</span>._items().<span class="fn">reduce</span>((sum, item) => sum + item.price, <span class="acc">0</span>)
+  );
+
+  <span class="fn">addItem</span>(item: <span class="cls">CartItem</span>) {
+    <span class="kw">this</span>._items.<span class="fn">update</span>(items => [...items, item]);
+  }
+
+  <span class="fn">loadCart</span>() {
+    <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="acc">true</span>);
+    <span class="kw">this</span>.http.<span class="fn">get</span>&lt;<span class="cls">CartItem</span>[]&gt;(<span class="str">'/api/cart'</span>).<span class="fn">subscribe</span>({
+      next: (data) => { <span class="kw">this</span>._items.<span class="fn">set</span>(data); <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="acc">false</span>); }
+    });
+  }
+}</pre>
+          <p style="margin-top: 12px">
+            <strong>✅ Evita effetti collaterali nei computed</strong>
+          </p>
+          <pre><span class="cmt">// ❌ MALE: side-effect in computed</span>
+badComputed = <span class="fn">computed</span>(() => {
+  <span class="kw">const</span> value = <span class="kw">this</span>.<span class="fn">count</span>();
+  console.<span class="fn">log</span>(<span class="str">'Computing...'</span>);        <span class="cmt">// ❌</span>
+  localStorage.<span class="fn">setItem</span>(<span class="str">'count'</span>, value); <span class="cmt">// ❌</span>
+  <span class="kw">return</span> value * <span class="acc">2</span>;
+});
+
+<span class="cmt">// ✅ BENE: computed puro + side-effect in effect</span>
+goodComputed = <span class="fn">computed</span>(() => <span class="kw">this</span>.<span class="fn">count</span>() * <span class="acc">2</span>);
+
+<span class="fn">constructor</span>() {
+  <span class="fn">effect</span>(() => {
+    <span class="kw">const</span> value = <span class="kw">this</span>.<span class="fn">count</span>();
+    console.<span class="fn">log</span>(<span class="str">'Count:'</span>, value);           <span class="cmt">// ✅</span>
+    localStorage.<span class="fn">setItem</span>(<span class="str">'count'</span>, value); <span class="cmt">// ✅</span>
+  });
+}</pre>
+          <p style="margin-top: 12px">
+            <strong>✅ Cleanup in effect quando necessario</strong>
+          </p>
+          <pre><span class="fn">constructor</span>() {
+  <span class="fn">effect</span>((onCleanup) => {
+    <span class="kw">const</span> shouldPoll = <span class="kw">this</span>.<span class="fn">autoPoll</span>();
+    <span class="kw">if</span> (shouldPoll) {
+      <span class="kw">const</span> interval = <span class="fn">setInterval</span>(() => <span class="kw">this</span>.<span class="fn">fetchData</span>(), <span class="acc">5000</span>);
+      <span class="fn">onCleanup</span>(() => <span class="fn">clearInterval</span>(interval)); <span class="cmt">// ✅ Cleanup</span>
+    }
+  });
+}</pre>
+          <div class="rule-box">
+            <div class="rule-title">
+              Signal per stato locale, Service per condivisione
+            </div>
+            <div class="rule-text">
+              Component: <code>formData = signal(...)</code> — solo per questo
+              component.<br />
+              Service <code>@Injectable({ providedIn: 'root' })</code>:
+              <code>private _user = signal&lt;User | null&gt;(null)</code> —
+              condiviso tra tutti i component.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8. Migrazione -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">8 — Migrazione da vecchio approccio</span>
+          <span class="card-tag tag-pattern">migrazione</span>
+        </div>
+        <div class="card-body">
+          <div class="grid2">
+            <div>
+              <p><strong>Prima (senza signal)</strong></p>
+              <pre><span class="kw">export class</span> <span class="cls">OldComponent</span> {
+  products:  <span class="cls">Product</span>[] = [];
+  loading    = <span class="acc">false</span>;
+  searchTerm = <span class="str">''</span>;
+
+  <span class="fn">get</span> filteredProducts() {
+    <span class="kw">return this</span>.products
+      .<span class="fn">filter</span>(p => p.name.<span class="fn">includes</span>(<span class="kw">this</span>.searchTerm));
+  }
+
+  <span class="fn">get</span> total() {
+    <span class="kw">return this</span>.filteredProducts
+      .<span class="fn">reduce</span>((sum, p) => sum + p.price, <span class="acc">0</span>);
+  }
+
+  <span class="fn">ngOnInit</span>() { <span class="kw">this</span>.<span class="fn">loadProducts</span>(); }
+
+  <span class="fn">loadProducts</span>() {
+    <span class="kw">this</span>.loading = <span class="acc">true</span>;
+    <span class="kw">this</span>.service.<span class="fn">getProducts</span>().<span class="fn">subscribe</span>(data => {
+      <span class="kw">this</span>.products = data;
+      <span class="kw">this</span>.loading  = <span class="acc">false</span>;
+    });
+  }
+}</pre>
+            </div>
+            <div>
+              <p><strong>Dopo (con signal)</strong></p>
+              <pre><span class="kw">export class</span> <span class="cls">NewComponent</span> {
+  products   = <span class="fn">signal</span>&lt;<span class="cls">Product</span>[]&gt;([]);
+  loading    = <span class="fn">signal</span>(<span class="acc">false</span>);
+  searchTerm = <span class="fn">signal</span>(<span class="str">''</span>);
+
+  filteredProducts = <span class="fn">computed</span>(() =>
+    <span class="kw">this</span>.products()
+      .<span class="fn">filter</span>(p => p.name.<span class="fn">includes</span>(<span class="kw">this</span>.<span class="fn">searchTerm</span>()))
+  );
+
+  total = <span class="fn">computed</span>(() =>
+    <span class="kw">this</span>.<span class="fn">filteredProducts</span>()
+      .<span class="fn">reduce</span>((sum, p) => sum + p.price, <span class="acc">0</span>)
+  );
+
+  <span class="fn">ngOnInit</span>() { <span class="kw">this</span>.<span class="fn">loadProducts</span>(); }
+
+  <span class="fn">loadProducts</span>() {
+    <span class="kw">this</span>.loading.<span class="fn">set</span>(<span class="acc">true</span>);
+    <span class="kw">this</span>.service.<span class="fn">getProducts</span>().<span class="fn">subscribe</span>(data => {
+      <span class="kw">this</span>.products.<span class="fn">set</span>(data);
+      <span class="kw">this</span>.loading.<span class="fn">set</span>(<span class="acc">false</span>);
+    });
+  }
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recap -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Recap Completo</span>
+          <span class="card-tag tag-state">riepilogo</span>
         </div>
         <div class="card-body">
           <table>
             <tr>
-              <th>Aspetto</th>
-              <th>NGXS</th>
-              <th>Signals</th>
+              <th>Concetto</th>
+              <th>Usa per</th>
+              <th>Esempio</th>
             </tr>
             <tr>
-              <td>Chiamare un'azione</td>
-              <td><code>store.dispatch(new LoadOfferte(id))</code></td>
-              <td><code>store.loadOfferte(id)</code></td>
+              <td>signal()</td>
+              <td>Stato mutabile</td>
+              <td><code>count = signal(0)</code></td>
             </tr>
             <tr>
-              <td>Leggere lo stato nel template</td>
-              <td><code>offerte$ | async</code></td>
+              <td>computed()</td>
+              <td>Valori derivati</td>
+              <td><code>double = computed(() => count() * 2)</code></td>
+            </tr>
+            <tr>
+              <td>effect()</td>
+              <td>Side-effects</td>
+              <td><code>effect(() => console.log(count()))</code></td>
+            </tr>
+            <tr>
+              <td>untracked()</td>
+              <td>Leggere senza dipendenza</td>
+              <td><code>untracked(() => this.config())</code></td>
+            </tr>
+            <tr>
+              <td>toSignal()</td>
+              <td>Observable → Signal</td>
+              <td><code>users = toSignal(http.get(...))</code></td>
+            </tr>
+            <tr>
+              <td>toObservable()</td>
+              <td>Signal → Observable</td>
+              <td><code>obs$ = toObservable(searchTerm)</code></td>
+            </tr>
+            <tr>
+              <td>input()</td>
+              <td>Input reattivi</td>
+              <td><code>userName = input('')</code></td>
+            </tr>
+            <tr>
+              <td>output()</td>
+              <td>Output eventi</td>
+              <td><code>clicked = output&lt;void&gt;()</code></td>
+            </tr>
+            <tr>
+              <td>.asReadonly()</td>
+              <td>Proteggere signal</td>
+              <td><code>readonly count = _count.asReadonly()</code></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Service: Observable vs Signal -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Nel Service: Observable o Signal?</span>
+          <span class="card-tag tag-service">architettura</span>
+        </div>
+        <div class="card-body">
+          <div class="rule-box">
+            <div class="rule-title">Regola d'oro</div>
+            <div class="rule-text">
+              <strong>Observable</strong> → per operazioni async (HTTP,
+              WebSocket, timer)<br />
+              <strong>Signal</strong> → per stato condiviso tra componenti
+            </div>
+          </div>
+          <p><strong>Pattern corretto: Service con entrambi</strong></p>
+          <pre><span class="dec">@Injectable</span>({ providedIn: <span class="str">'root'</span> })
+<span class="kw">export class</span> <span class="cls">ProductsService</span> {
+  <span class="kw">private</span> http = <span class="fn">inject</span>(<span class="cls">HttpClient</span>);
+
+  <span class="cmt">// ===== STATO (Signal) - condiviso tra componenti =====</span>
+  <span class="kw">private</span> _products = <span class="fn">signal</span>&lt;<span class="cls">Product</span>[]&gt;([]);
+  <span class="kw">private</span> _loading  = <span class="fn">signal</span>(<span class="acc">false</span>);
+  <span class="kw">private</span> _error    = <span class="fn">signal</span>&lt;<span class="typ">string | null</span>&gt;(<span class="kw">null</span>);
+
+  <span class="kw">readonly</span> products       = <span class="kw">this</span>._products.<span class="fn">asReadonly</span>();
+  <span class="kw">readonly</span> loading        = <span class="kw">this</span>._loading.<span class="fn">asReadonly</span>();
+  <span class="kw">readonly</span> error          = <span class="kw">this</span>._error.<span class="fn">asReadonly</span>();
+  <span class="kw">readonly</span> totalProducts  = <span class="fn">computed</span>(() => <span class="kw">this</span>._products().length);
+  <span class="kw">readonly</span> activeProducts = <span class="fn">computed</span>(() => <span class="kw">this</span>._products().<span class="fn">filter</span>(p => p.active));
+
+  <span class="cmt">// ===== METODI HTTP (Observable) - operazioni async =====</span>
+  <span class="fn">getProducts</span>(): <span class="cls">Observable</span>&lt;<span class="cls">Product</span>[]&gt; {
+    <span class="kw">return this</span>.http.<span class="fn">get</span>&lt;<span class="cls">Product</span>[]&gt;(<span class="str">'/api/products'</span>);
+  }
+
+  <span class="fn">createProduct</span>(product: <span class="cls">Omit</span>&lt;<span class="cls">Product</span>, <span class="str">'id'</span>&gt;): <span class="cls">Observable</span>&lt;<span class="cls">Product</span>&gt; {
+    <span class="kw">return this</span>.http.<span class="fn">post</span>&lt;<span class="cls">Product</span>&gt;(<span class="str">'/api/products'</span>, product);
+  }
+
+  <span class="fn">deleteProduct</span>(id: <span class="typ">number</span>): <span class="cls">Observable</span>&lt;<span class="typ">void</span>&gt; {
+    <span class="kw">return this</span>.http.<span class="fn">delete</span>&lt;<span class="typ">void</span>&gt;(<span class="str">`/api/products/${id}`</span>);
+  }
+
+  <span class="cmt">// ===== METODI PUBBLICI - aggiornano lo stato =====</span>
+  <span class="fn">loadProducts</span>() {
+    <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="acc">true</span>); <span class="kw">this</span>._error.<span class="fn">set</span>(<span class="kw">null</span>);
+    <span class="kw">this</span>.<span class="fn">getProducts</span>().<span class="fn">subscribe</span>({
+      next:  (data) => { <span class="kw">this</span>._products.<span class="fn">set</span>(data); <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="acc">false</span>); },
+      error: (err)  => { <span class="kw">this</span>._error.<span class="fn">set</span>(<span class="str">'Errore caricamento'</span>); <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="acc">false</span>); }
+    });
+  }
+
+  <span class="fn">addProduct</span>(product: <span class="cls">Omit</span>&lt;<span class="cls">Product</span>, <span class="str">'id'</span>&gt;) {
+    <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="acc">true</span>);
+    <span class="kw">this</span>.<span class="fn">createProduct</span>(product).<span class="fn">subscribe</span>({
+      next:  (created) => { <span class="kw">this</span>._products.<span class="fn">update</span>(list => [...list, created]); <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="acc">false</span>); },
+      error: (err)     => { <span class="kw">this</span>._error.<span class="fn">set</span>(<span class="str">'Errore creazione'</span>); <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="acc">false</span>); }
+    });
+  }
+
+  <span class="fn">removeProduct</span>(id: <span class="typ">number</span>) {
+    <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="acc">true</span>);
+    <span class="kw">this</span>.<span class="fn">deleteProduct</span>(id).<span class="fn">subscribe</span>({
+      next:  ()    => { <span class="kw">this</span>._products.<span class="fn">update</span>(list => list.<span class="fn">filter</span>(p => p.id !== id)); <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="acc">false</span>); },
+      error: (err) => { <span class="kw">this</span>._error.<span class="fn">set</span>(<span class="str">'Errore eliminazione'</span>); <span class="kw">this</span>._loading.<span class="fn">set</span>(<span class="acc">false</span>); }
+    });
+  }
+}</pre>
+          <p style="margin-top: 14px">
+            <strong>Component usa i Signal del Service</strong>
+          </p>
+          <pre><span class="kw">export class</span> <span class="cls">ProductsComponent</span> {
+  service = <span class="fn">inject</span>(<span class="cls">ProductsService</span>);
+
+  <span class="cmt">// Leggi signal dal service</span>
+  products      = <span class="kw">this</span>.service.products;
+  loading       = <span class="kw">this</span>.service.loading;
+  error         = <span class="kw">this</span>.service.error;
+  totalProducts = <span class="kw">this</span>.service.totalProducts;
+
+  <span class="cmt">// Signal locale + computed che usa signal del service</span>
+  searchTerm = <span class="fn">signal</span>(<span class="str">''</span>);
+  filteredProducts = <span class="fn">computed</span>(() =>
+    <span class="kw">this</span>.service.products().<span class="fn">filter</span>(p => p.name.<span class="fn">includes</span>(<span class="kw">this</span>.<span class="fn">searchTerm</span>()))
+  );
+
+  <span class="fn">ngOnInit</span>() { <span class="kw">this</span>.service.<span class="fn">loadProducts</span>(); }
+  <span class="fn">onAdd</span>(product: <span class="cls">Omit</span>&lt;<span class="cls">Product</span>, <span class="str">'id'</span>&gt;) { <span class="kw">this</span>.service.<span class="fn">addProduct</span>(product); }
+  <span class="fn">onDelete</span>(id: <span class="typ">number</span>)                  { <span class="kw">this</span>.service.<span class="fn">removeProduct</span>(id); }
+}</pre>
+          <table style="margin-top: 14px">
+            <tr>
+              <th>Pattern</th>
+              <th>Quando</th>
+              <th>Esempi</th>
+            </tr>
+            <tr>
+              <td>Service con Signal</td>
               <td>
-                <code>store.offerte()</code> — le
-                <strong>parentesi</strong> leggono il valore corrente
+                Più component accedono agli stessi dati, single source of truth
               </td>
+              <td>Cart, Auth, Notifications</td>
             </tr>
             <tr>
-              <td>Stato derivato</td>
-              <td>Selector con <code>createSelector</code></td>
-              <td><code>computed(() => ...)</code> — ricalcolo automatico</td>
-            </tr>
-            <tr>
-              <td>Aggiornamento DOM</td>
-              <td>Zone.js rileva ogni cambiamento</td>
+              <td>Service solo Observable</td>
               <td>
-                Angular aggiorna <em>solo</em> il nodo che dipende dal signal
-                cambiato
+                Ogni component gestisce il proprio stato, chiamate one-off
               </td>
+              <td>API wrapper, Logger</td>
             </tr>
             <tr>
-              <td>File necessari</td>
+              <td>Pattern ibrido</td>
               <td>
-                <code>actions.ts</code> · <code>state.ts</code> ·
-                <code>selectors.ts</code>
+                Stato condiviso + ricerche/filtri indipendenti per component
               </td>
-              <td>Un solo <code>vendita.store.ts</code></td>
+              <td>UserService (currentUser signal + searchUsers observable)</td>
             </tr>
           </table>
           <div class="rule-box" style="margin-top: 12px">
-            <div class="rule-title">Le parentesi contano</div>
+            <div class="rule-title">Regola finale</div>
             <div class="rule-text">
-              <code>store.offerte</code> è il signal (oggetto).
-              <code>store.offerte()</code> è il valore attuale (array). Nel
-              template Angular devi sempre usare le parentesi per "leggere" il
-              segnale; senza parentesi ottieni l'oggetto signal, non i dati.
+              <code>❌ getProducts(): Signal&lt;Product[]&gt;</code> — non fare
+              questo<br />
+              <code>✅ getProducts(): Observable&lt;Product[]&gt;</code> —
+              metodo HTTP ritorna sempre Observable<br />
+              <code>✅ private _products = signal&lt;Product[]&gt;([])</code> —
+              stato condiviso come signal<br />
+              <code
+                >✅ loadProducts() { this.getProducts().subscribe(data =>
+                this._products.set(data)) }</code
+              >
             </div>
           </div>
         </div>
